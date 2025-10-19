@@ -1,0 +1,195 @@
+<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="description" content="ICQ Conversations">
+        <meta name="keywords" content="ICQ, Conversations">
+        <title>ICQ Conversation with {{ contact_name["UID"] }}</title>
+        <link rel="icon"
+              type="image/png"
+              sizes="30x30"
+              href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJEAAACRCAMAAAD0BqoRAAAAQlBMVEUAAAAA03kA1nwA1nwA03wA1XwAz3AA1XwA1HoA1XwA1XwA1XwA1X0A1nwA1XsA0nwA1nkA1HoAz4AA134Az3oA1XxwwJseAAAAFXRSTlMAIN+/QIAQ72CQcM+fr6BQUDAQXzAugqbwAAADZ0lEQVR42u3b2XKcMBAF0G7tEutg9///alJ2ZTSFBy2ABCnrPNuVG4GWbmFomqZpmqZpmqZJgLMxs1BwE8Jq+tZZhOsJTq/6qzMpS2sSroSMfrJQRTyQ18NV1FegO42SpS0zXOJBm7SCK3Cf4B4TDilAwwUshQior6Mv95luCwVxqO6TghhUJygMYn5Bos/bJUIK6qA+TSEDrKjZDpxxbg1CIQOFmMBJszMKSjAUgm/yeMxAAUvosY2x/YYhnE+mbWvY0TtawOkWlrKH4OZPfYBXfJEUKRuyfsDpbHyILG1jCs62sNgQudpHFhEZIiSqfa6zwX8HGZU8RSlhpDQifpLk0WXdU0caDpq+6F5ESiThF6woBzsh3+x/uM0hmsk7+7E5vZq2IlC2ifVLVKCKksH1FvX7/zWjFAg7zJEtwL0t+S0leZzXkvl4P9/GdcwCK1IfKu3XmTvll8ZSiZAoHmmkb1b5jMWemklqgKAbeO+UX8pTqUo9meQhYmeXHDK8AceNkI8oP5KjVDOkOnaekCUf2kJh/NAYyfNLV9K579HxEonv2Zg0JTE7t9kwFfylEsfsZc+7uXQU1ynYZ9xzCERWLhCg3lNy4Uhho4Ld3L7JIsbAOGlXpOWgpYIg9ZjkwHXgF8+MxB3m1FVD94zDnYLDBKNX2k4KsqGYjJkQTmK65+BIAfeAk7TWTbe51P9voDHzA9aEHPjgEOpz3bvOqxroWy+grpmtVsqfGwgzCqoRfGPxZvSK9Qjl+Twe315NuYHifB5PBAojVvAt93nWePhAW/DhYR88cE9EdTOpPnLgNkfP+fnNtkiiT6KKTX7F49egSLUixc/OKVU5UxUD0Xr2l/9Yqksrbnm1eweZ2FQYa329gRTB8mrg4/rURIbCXKUh8p8cTBQ2wDkcxfDE7AzOwZMTLRQBp1gyboF0lUQiI1FXJdFEXmw1HqokMhmJbGROVk4U/9mxWiKbOAtMtffI+ZWixi6CORdloshDy29Qq7TlFAt8+xCfQqLGN8kiq30vcze18pcRY4X6SORdAo2BQFUGiWHCIZgrOBXqvKtEwSI99eOm3BlkOD0xqeB8LntKo7H8r949oAyj7/N3D4GyVs9wKbnOZC/vuKPpXt/Xy/P8u44YOO+tQWiapmmapmmapml+lz8DiXlfldCVWwAAAABJRU5ErkJggg==" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='convo.css') }}">
+    </head>
+    <body>
+        <div class="navbar">
+            <a href="/">Home</a><a href="/attachments.html">Files</a><a href="#">Top</a>
+            {% if not printing %}
+                <form action="{{ url_for("search") }}" method="get">
+                    <input type="text" name="q" placeholder="Search">
+                    <button type="submit">Search</button>
+                </form>
+            {% endif %}
+        </div>
+        <h1 class="title">
+            {% if contact_name.ConversationType == "GROUP CHAT" %}
+                Conversation in chatroom {{ contact_name.AIMID }} - {{ contact_name.FriendlyName }}
+            {% elif contact_name.ConversationType == "PRIVATE" %}
+                Conversation with {{ contact_name.AIMID }} - {{ contact_name.FriendlyName }}
+            {% endif %}
+            {% if avatar %}
+                <img src="{{ url_for('serve', file=avatar) }}"
+                     alt="{{ avatar }}"
+                     title="{{ avatar }}"
+                     class="avatar">
+            {% endif %}
+        </h1>
+        <div class="main">
+            <br />
+            <table class="t2">
+                <tr>
+                    <th class="header" title="DT">Date/Time UTC</th>
+                    <th class="header" title="Contact">Contact</th>
+                    <th class="header" title="Message">Message</th>
+                </tr>
+                <br/>
+                    {% if messages is not none %}
+                        {% for k, v in messages.items() %}
+                            {% if v.MESSAGE.DIRECTION == "INCOMING" %}
+                                {% if "VOIP" in v %}
+                                    {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_IS_INCOMING", "Unknown") + " from " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
+                                    {% set class = "msg rcvd voip" %}
+                                {% else %}
+                                    {% set msg = v.MESSAGE.TEXT %}
+                                    {% set class = "msg rcvd" %}
+                                {% endif %}
+                                {% if msg == "" and "QUOTE_TEXT" in v.MESSAGE and v.MESSAGE.QUOTE_TEXT != "" %}
+                                    {% set msg = v.MESSAGE.QUOTE_TEXT %}
+                                {% endif %}
+                                <tr class="msg rcvd">
+                                    <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
+                                    <td class="nowrap normal">{{ v.UID }}</td>
+                                    {% if "SharedContentDetails" in v %}
+                                        {% set class = "msg rcvd attachment" %}
+                                    {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is true %}
+                                        {% set class = "msg rcvd fwd" %}
+                                    {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is false %}
+                                        {% if v.MESSAGE.QUOTE_SENDER_SN == contact_name.AIMID %}
+                                        {% set class = "msg rcvd theirquote" %}
+                                        {% elif v.MESSAGE.QUOTE_SENDER_SN == owner.AIMID %}
+                                        {% set class = "msg rcvd myquote" %}
+                                        {% else %}
+                                        {% set class = "msg rcvd theirquote" %}
+                                        {% endif %}
+                                    {% endif %}
+                                    <td class="{{ class }}">
+                                        <div class="bubble">
+                                            {% if "SharedContentDetails" in v %}
+                                                <br/>
+                                                <table class="attachment">
+                                                <tr><td></td></tr>
+                                                {{ msg|replace('\n', '<br>')|safe }}<p><br>
+                                                {% for key, val in v["SharedContentDetails"].items() %}
+                                                    {% if val is not none and val != "" %}
+                                                        <tr>
+                                                        <td class="nowrap normal white">{{ key }}:</td>
+                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" %}
+                                                            <td class="nowrap normal white">
+                                                            {% for k, v in val.items() %}
+                                                                {{ k }}: {{ v }}<br>
+                                                            {% endfor %}
+                                                            </td>
+                                                        {% else %}
+                                                            <td class="white">{{ val }}</td>
+                                                        {% endif %}
+                                                        </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                    </table>
+                                            {% elif class == "msg rcvd fwd" or class == "msg rcvd myquote" or class == "msg rcvd theirquote" %}
+                                                <br/>
+                                                    <table class="attachment">
+                                                    <tr><td></td></tr>
+                                                {{ msg|replace('\n', '<br>') |safe }}<p><br>
+                                                {% for key, val in v.MESSAGE.items() %}
+                                                    {% if key.startswith('QUOTE') %}
+                                                    <tr>
+                                                        <td class="nowrap normal white">{{ key }}: {{ val }}</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                </table>
+                                            {% else %}
+                                                {{ msg|replace('\n', '<br>') |safe }}
+                                            {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% elif v.MESSAGE.DIRECTION == "OUTGOING" %}
+                                    {% if "VOIP" in v %}
+                                        {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_IS_INCOMING", "Unknown") + " to " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
+                                        {% set class = "msg sent voip" %}
+                                    {% else %}
+                                        {% set msg = v.MESSAGE.TEXT %}
+                                        {% set class = "msg sent" %}
+                                    {% endif %}
+                                {% if msg == "" and "QUOTE_TEXT" in v.MESSAGE and v.MESSAGE.QUOTE_TEXT != "" %}
+                                    {% set msg = v.MESSAGE.QUOTE_TEXT %}
+                                {% endif %}
+                                <tr class="msg sent">
+                                    <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
+                                    <td class="nowrap normal">{{ v.UID }}</td>
+                                    {% if "SharedContentDetails" in v %}
+                                        {% set class = "msg sent attachment" %}
+                                    {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is true %}
+                                        {% set class = "msg sent fwd" %}
+                                    {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is false %}
+                                        {% if v.MESSAGE.QUOTE_SENDER_SN == contact_name.AIMID %}
+                                        {% set class = "msg sent theirquote" %}
+                                        {% elif v.MESSAGE.QUOTE_SENDER_SN == owner.AIMID %}
+                                        {% set class = "msg sent myquote" %}
+                                        {% else %}
+                                        {% set class = "msg sent theirquote" %}
+                                        {% endif %}
+                                    {% endif %}
+                                    <td class="{{ class }}">
+                                        <div class="bubble">
+                                            {% if "SharedContentDetails" in v %}
+                                                <br/>
+                                                <table class="attachment">
+                                                <tr><td></td></tr>
+                                                {{ msg|replace('\n', '<br>')|safe }}<p><br>
+                                                {% for key, val in v["SharedContentDetails"].items() %}
+                                                    {% if val is not none and val != "" %}
+                                                        <tr>
+                                                        <td class="nowrap normal white">{{ key }}:</td>
+                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" %}
+                                                            <td class="nowrap normal white">
+                                                            {% for k, v in val.items() %}
+                                                                {{ k }}: {{ v }}<br>
+                                                            {% endfor %}
+                                                            </td>
+                                                        {% else %}
+                                                            <td class="white">{{ val }}</td>
+                                                        {% endif %}
+                                                        </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                    </table>
+                                            {% elif class == "msg sent fwd" or class == "msg sent theirquote" or class == "msg sent myquote" %}
+                                                <br/>
+                                                    <table class="attachment">
+                                                    <tr><td></td></tr>
+                                                {{ msg|replace('\n', '<br>') |safe }}<p><br>
+                                                {% for key, val in v.MESSAGE.items() %}
+                                                    {% if key.startswith('QUOTE') %}
+                                                    <tr>
+                                                        <td class="nowrap normal white">{{ key }}: {{ val }}</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                </table>
+                                            {% else %}
+                                                {{ msg|replace('\n', '<br>') |safe }}
+                                            {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </table>
+                    </div>
+                    <br />
+                </body>
+            </html>

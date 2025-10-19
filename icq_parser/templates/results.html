@@ -1,0 +1,86 @@
+<!DOCTYPE HTML>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="description" content="Search Results">
+        <meta name="keywords" content="ICQ, Search, Results">
+        {% set ns = namespace(total = 0) %}
+        {% if results %}
+        {% for k, v in results.items() %}
+            {% set ns.total = ns.total + v.snippets|length %}
+        {% endfor %}
+        {% endif %}
+        <title>Search results for "{{ query }}" - {{ ns.total }} results</title>
+        <link rel="icon"
+              type="image/png"
+              sizes="30x30"
+              href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJEAAACRCAMAAAD0BqoRAAAAQlBMVEUAAAAA03kA1nwA1nwA03wA1XwAz3AA1XwA1HoA1XwA1XwA1XwA1X0A1nwA1XsA0nwA1nkA1HoAz4AA134Az3oA1XxwwJseAAAAFXRSTlMAIN+/QIAQ72CQcM+fr6BQUDAQXzAugqbwAAADZ0lEQVR42u3b2XKcMBAF0G7tEutg9///alJ2ZTSFBy2ABCnrPNuVG4GWbmFomqZpmqZpmqZJgLMxs1BwE8Jq+tZZhOsJTq/6qzMpS2sSroSMfrJQRTyQ18NV1FegO42SpS0zXOJBm7SCK3Cf4B4TDilAwwUshQior6Mv95luCwVxqO6TghhUJygMYn5Bos/bJUIK6qA+TSEDrKjZDpxxbg1CIQOFmMBJszMKSjAUgm/yeMxAAUvosY2x/YYhnE+mbWvY0TtawOkWlrKH4OZPfYBXfJEUKRuyfsDpbHyILG1jCs62sNgQudpHFhEZIiSqfa6zwX8HGZU8RSlhpDQifpLk0WXdU0caDpq+6F5ESiThF6woBzsh3+x/uM0hmsk7+7E5vZq2IlC2ifVLVKCKksH1FvX7/zWjFAg7zJEtwL0t+S0leZzXkvl4P9/GdcwCK1IfKu3XmTvll8ZSiZAoHmmkb1b5jMWemklqgKAbeO+UX8pTqUo9meQhYmeXHDK8AceNkI8oP5KjVDOkOnaekCUf2kJh/NAYyfNLV9K579HxEonv2Zg0JTE7t9kwFfylEsfsZc+7uXQU1ynYZ9xzCERWLhCg3lNy4Uhho4Ld3L7JIsbAOGlXpOWgpYIg9ZjkwHXgF8+MxB3m1FVD94zDnYLDBKNX2k4KsqGYjJkQTmK65+BIAfeAk7TWTbe51P9voDHzA9aEHPjgEOpz3bvOqxroWy+grpmtVsqfGwgzCqoRfGPxZvSK9Qjl+Twe315NuYHifB5PBAojVvAt93nWePhAW/DhYR88cE9EdTOpPnLgNkfP+fnNtkiiT6KKTX7F49egSLUixc/OKVU5UxUD0Xr2l/9Yqksrbnm1eweZ2FQYa329gRTB8mrg4/rURIbCXKUh8p8cTBQ2wDkcxfDE7AzOwZMTLRQBp1gyboF0lUQiI1FXJdFEXmw1HqokMhmJbGROVk4U/9mxWiKbOAtMtffI+ZWixi6CORdloshDy29Qq7TlFAt8+xCfQqLGN8kiq30vcze18pcRY4X6SORdAo2BQFUGiWHCIZgrOBXqvKtEwSI99eOm3BlkOD0xqeB8LntKo7H8r949oAyj7/N3D4GyVs9wKbnOZC/vuKPpXt/Xy/P8u44YOO+tQWiapmmapmmapml+lz8DiXlfldCVWwAAAABJRU5ErkJggg==" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    </head>
+    <body onload="sortTable(0)">
+        <div class="navbar">
+            <a href="/">Home</a><a href="/attachments.html">Files</a><a href="#">Top</a>
+            {% if not printing %}
+                <form action="{{ url_for("search") }}" method="get">
+                    <input type="text" name="q" placeholder="Search">
+                    <button type="submit">Search</button>
+                </form>
+            {% endif %}
+        </div>
+        <h1 class="title">Search results for "{{ query }}" - {{ ns.total }} results</h1>
+        <div class="main">
+            {% if results %}
+                <table id="results">
+                    <ul>
+                        <th onclick="sortTable(0)"
+                            title="Source URL where the search result is found">Source</th>
+                        <th onclick="sortTable(1)"
+                            title="Search Result, highlighted, within its original context">Result</th>
+                        {% for k, v in results.items() %}
+                            <tr>
+                                <td class="narrow">
+                                    <a href="{{ v.url }}">{{ v.url }}</a>
+                                    <br />
+                                </td>
+                                <td>
+                                    {% for snippet in v.snippets %}
+                                        ...{{ snippet|safe }}...
+                                        <br />
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </ul>
+                </table>
+                <br/>
+                {% else %}
+                    <p>No results found.</p>
+                {% endif %}
+            </div>
+            <script>
+function sortTable(columnIndex) {
+    const table = document.getElementById("results");
+    const rows = Array.from(table.rows).slice(1);
+    let ascending = table.getAttribute("data-sort-dir") !== "asc";
+
+    rows.sort((a, b) => {
+        const cellA = a.cells[columnIndex].textContent.trim();
+        const cellB = b.cells[columnIndex].textContent.trim();
+        const isNumber = !isNaN(cellA) && !isNaN(cellB);
+        if (isNumber) {
+            return ascending ? cellA - cellB : cellB - cellA;
+        } else {
+            return ascending
+                ? cellA.localeCompare(cellB)
+                : cellB.localeCompare(cellA);
+        }
+    });
+    for (const row of rows) {
+        table.tBodies[0].appendChild(row);
+    }
+    table.setAttribute("data-sort-dir", ascending ? "asc" : "desc");
+}
+            </script>
+        </body>
+</html>

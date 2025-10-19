@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools >= 77.0.30"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["debian*", "binaries*", "build*", "dist*"]
+
+[tool.setuptools.package-data]
+icq_parser = ['static/*.png', 'templates/*.html', 'static/*.css']
+
+[project]
+name = "icq-parser"
+version = "1.0.0"
+dependencies = [
+    "flask",
+    "playwright>=1.45.0",
+    "beautifulsoup4",
+    "pypdf",
+	"requests",
+	"pywebcopy"
+]
+requires-python = ">=3.9"
+authors = [
+  {name = "Corey Forman (digitalsleuth)", email = "github@digitalsleuth.ca"}
+]
+maintainers = [
+  {name = "Corey Forman (digitalsleuth)", email = "github@digitalsleuth.ca"}
+]
+description = "ICQ Parser"
+readme = "README.md"
+keywords = ["digital forensics", "dfir", "icq", "ios", "parse"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+Homepage = "https://github.com/digitalsleuth/icq-parser"
+
+[project.scripts]
+icq-parser = "icq_parser.icq_parser:main"

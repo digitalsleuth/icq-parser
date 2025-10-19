@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="description" content="ICQ Contacts">
+        <meta name="keywords" content="ICQ, Contacts">
+        <title>ICQ Contacts</title>
+        <link rel="icon"
+              type="image/png"
+              sizes="40x40"
+              href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJEAAACRCAMAAAD0BqoRAAAAQlBMVEUAAAAA03kA1nwA1nwA03wA1XwAz3AA1XwA1HoA1XwA1XwA1XwA1X0A1nwA1XsA0nwA1nkA1HoAz4AA134Az3oA1XxwwJseAAAAFXRSTlMAIN+/QIAQ72CQcM+fr6BQUDAQXzAugqbwAAADZ0lEQVR42u3b2XKcMBAF0G7tEutg9///alJ2ZTSFBy2ABCnrPNuVG4GWbmFomqZpmqZpmqZJgLMxs1BwE8Jq+tZZhOsJTq/6qzMpS2sSroSMfrJQRTyQ18NV1FegO42SpS0zXOJBm7SCK3Cf4B4TDilAwwUshQior6Mv95luCwVxqO6TghhUJygMYn5Bos/bJUIK6qA+TSEDrKjZDpxxbg1CIQOFmMBJszMKSjAUgm/yeMxAAUvosY2x/YYhnE+mbWvY0TtawOkWlrKH4OZPfYBXfJEUKRuyfsDpbHyILG1jCs62sNgQudpHFhEZIiSqfa6zwX8HGZU8RSlhpDQifpLk0WXdU0caDpq+6F5ESiThF6woBzsh3+x/uM0hmsk7+7E5vZq2IlC2ifVLVKCKksH1FvX7/zWjFAg7zJEtwL0t+S0leZzXkvl4P9/GdcwCK1IfKu3XmTvll8ZSiZAoHmmkb1b5jMWemklqgKAbeO+UX8pTqUo9meQhYmeXHDK8AceNkI8oP5KjVDOkOnaekCUf2kJh/NAYyfNLV9K579HxEonv2Zg0JTE7t9kwFfylEsfsZc+7uXQU1ynYZ9xzCERWLhCg3lNy4Uhho4Ld3L7JIsbAOGlXpOWgpYIg9ZjkwHXgF8+MxB3m1FVD94zDnYLDBKNX2k4KsqGYjJkQTmK65+BIAfeAk7TWTbe51P9voDHzA9aEHPjgEOpz3bvOqxroWy+grpmtVsqfGwgzCqoRfGPxZvSK9Qjl+Twe315NuYHifB5PBAojVvAt93nWePhAW/DhYR88cE9EdTOpPnLgNkfP+fnNtkiiT6KKTX7F49egSLUixc/OKVU5UxUD0Xr2l/9Yqksrbnm1eweZ2FQYa329gRTB8mrg4/rURIbCXKUh8p8cTBQ2wDkcxfDE7AzOwZMTLRQBp1gyboF0lUQiI1FXJdFEXmw1HqokMhmJbGROVk4U/9mxWiKbOAtMtffI+ZWixi6CORdloshDy29Qq7TlFAt8+xCfQqLGN8kiq30vcze18pcRY4X6SORdAo2BQFUGiWHCIZgrOBXqvKtEwSI99eOm3BlkOD0xqeB8LntKo7H8r949oAyj7/N3D4GyVs9wKbnOZC/vuKPpXt/Xy/P8u44YOO+tQWiapmmapmmapml+lz8DiXlfldCVWwAAAABJRU5ErkJggg==" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    </head>
+    <body onload="sortTable(5)">
+        <div class="navbar">
+            <a href="/attachments.html">Files</a>
+            <a href="#">Top</a>
+            {% if not printing %}
+                <form action="{{ url_for("search") }}" method="get">
+                    <input type="text" name="q" placeholder="Search">
+                    <button type="submit">Search</button>
+                </form>
+            {% endif %}
+        </div>
+        <h1 class="title">
+            {% if device == "desktop" %}
+                ICQ Contacts for <a href="{{ url_for('contacts', contact=owner["AIMID"]) }}" class="link"> {{ owner["AIMID"] }}</a> - {{ owner["FRIENDLY_NAME"] }} - {{ owner["NICKNAME"] }} - {{ owner["ATTACHED_PHONE_NUMBER"] }}
+            {% else %}
+                ICQ Contacts for <a href="{{ url_for('contacts', contact=owner["UID"]) }}" class="link"> {{ owner["UID"] }}</a> - {{ owner["DisplayName"] }} - {{ owner["NickName"] }} - {{ owner["NormalizedPhoneNumber"] }}
+            {% endif %}
+        </h1>
+        <div class="main">
+            <table id="contacts">
+                <tr>
+                    <th onclick="sortTable(0)"
+                        title="This is the Contact ID or UID for the contact or group. If they joined ICQ using their phone number, then the UID may be their phone number.">
+                        Contact ID
+                    </th>
+                    <th onclick="sortTable(1)"
+                        title="This is the Display Name for the contact. This field is not always filled and may be blank.">
+                        Display / Friendly / Nick Name
+                    </th>
+                    <th onclick="sortTable(2)"
+                        title="If the contact has a Normalized phone number, their Phone # appears here.">Phone #</th>
+                    <th onclick="sortTable(3)"
+                        title="Number of messages in this conversation sent to this particular contact.">Sent</th>
+                    <th onclick="sortTable(4)"
+                        title="Number of messages in this conversation received from this particular contact.">
+                        Received
+                    </th>
+                    <th onclick="sortTable(5)"
+                        title="Number of messages in this conversation.">Total</th>
+                </tr>
+                {% for k, v in contacts.items() | sort(reverse=true) %}
+                    <tr>
+                        {% set msgs_total = 0 %}
+                        {% if "MessagesTotal" in v %}
+                            {% set msgs_total = v["MessagesTotal"] %}
+                        {% endif %}
+                        {% set msgs_sent = 0 %}
+                        {% if "MessagesSent" in v %}
+                            {% set msgs_sent = v["MessagesSent"] %}
+                        {% endif %}
+                        {% set msgs_rcvd = 0 %}
+                        {% if "MessagesReceived" in v %}
+                            {% set msgs_rcvd = v["MessagesReceived"] %}
+                        {% endif %}
+                        {% if msgs_total|int != 0 or msgs_sent|int != 0 or msgs_rcvd|int != 0 %}
+                            <td>
+                                <a href="{{ url_for('contacts', contact=k) }}">{{ k }}</a> <a href="{{ url_for('conversation', contact=k) }}">view</a>
+                            </td>
+                        {% else %}
+                            <td>
+                                <a href="{{ url_for('contacts', contact=k) }}">{{ k }}</a>
+                            </td>
+                        {% endif %}
+                        {% if device == "desktop" %}
+                            {% if v["FriendlyName"] != "" %}
+                              <td>{{ v["FriendlyName"] }}</td>
+                            {% else %}
+                              <td>{{ v["NickName"] }}</td>
+                            {% endif %}
+                        {% else %}
+                            <td>{{ v["DisplayName"] }}</td>
+                        {% endif %}
+                        {% if device == "desktop" %}
+                            <td>{{ v["SMSNumber"] }}
+                        {% else %}
+                            {% if v["NormalizedPhoneNumber"] == "" %}
+                                <td>None</td>
+                            {% else %}
+                                <td>{{ v["NormalizedPhoneNumber"] }}</td>
+                            {% endif %}
+                        {% endif %}
+                        <td>{{ msgs_sent }}</td>
+                        <td>{{ msgs_rcvd }}</td>
+                        <td>{{ msgs_total }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <h2>
+            {{ contacts | length }} Contacts | {{ owner["TOTAL_SENT"] }} messages sent | {{ owner["TOTAL_RCVD"] }} messages received | {{ owner["TOTAL_ALL"] }} messages in total
+        </h2>
+        <br />
+        <script>
+function sortTable(columnIndex) {
+    const table = document.getElementById("contacts");
+    const rows = Array.from(table.rows).slice(1);
+    let ascending = table.getAttribute("data-sort-dir") === "desc";
+
+    rows.sort((a, b) => {
+        const cellA = a.cells[columnIndex].textContent.trim();
+        const cellB = b.cells[columnIndex].textContent.trim();
+        const isNumber = !isNaN(cellA) && !isNaN(cellB);
+        if (isNumber) {
+            return ascending ? cellA - cellB : cellB - cellA;
+        } else {
+            return ascending
+                ? cellA.localeCompare(cellB)
+                : cellB.localeCompare(cellA);
+        }
+    });
+    for (const row of rows) {
+        table.tBodies[0].appendChild(row);
+    }
+    table.setAttribute("data-sort-dir", ascending ? "asc" : "desc");
+}
+        </script>
+    </body>
+</html>

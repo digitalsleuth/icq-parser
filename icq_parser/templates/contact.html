@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="description" content="ICQ Contact Details">
+        <meta name="keywords" content="ICQ, Contact, Details">
+        <title>{{ contact }} - {{ contacts[contact]["DisplayName"] }}</title>
+        <link rel="icon"
+              type="image/png"
+              sizes="30x30"
+              href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJEAAACRCAMAAAD0BqoRAAAAQlBMVEUAAAAA03kA1nwA1nwA03wA1XwAz3AA1XwA1HoA1XwA1XwA1XwA1X0A1nwA1XsA0nwA1nkA1HoAz4AA134Az3oA1XxwwJseAAAAFXRSTlMAIN+/QIAQ72CQcM+fr6BQUDAQXzAugqbwAAADZ0lEQVR42u3b2XKcMBAF0G7tEutg9///alJ2ZTSFBy2ABCnrPNuVG4GWbmFomqZpmqZpmqZJgLMxs1BwE8Jq+tZZhOsJTq/6qzMpS2sSroSMfrJQRTyQ18NV1FegO42SpS0zXOJBm7SCK3Cf4B4TDilAwwUshQior6Mv95luCwVxqO6TghhUJygMYn5Bos/bJUIK6qA+TSEDrKjZDpxxbg1CIQOFmMBJszMKSjAUgm/yeMxAAUvosY2x/YYhnE+mbWvY0TtawOkWlrKH4OZPfYBXfJEUKRuyfsDpbHyILG1jCs62sNgQudpHFhEZIiSqfa6zwX8HGZU8RSlhpDQifpLk0WXdU0caDpq+6F5ESiThF6woBzsh3+x/uM0hmsk7+7E5vZq2IlC2ifVLVKCKksH1FvX7/zWjFAg7zJEtwL0t+S0leZzXkvl4P9/GdcwCK1IfKu3XmTvll8ZSiZAoHmmkb1b5jMWemklqgKAbeO+UX8pTqUo9meQhYmeXHDK8AceNkI8oP5KjVDOkOnaekCUf2kJh/NAYyfNLV9K579HxEonv2Zg0JTE7t9kwFfylEsfsZc+7uXQU1ynYZ9xzCERWLhCg3lNy4Uhho4Ld3L7JIsbAOGlXpOWgpYIg9ZjkwHXgF8+MxB3m1FVD94zDnYLDBKNX2k4KsqGYjJkQTmK65+BIAfeAk7TWTbe51P9voDHzA9aEHPjgEOpz3bvOqxroWy+grpmtVsqfGwgzCqoRfGPxZvSK9Qjl+Twe315NuYHifB5PBAojVvAt93nWePhAW/DhYR88cE9EdTOpPnLgNkfP+fnNtkiiT6KKTX7F49egSLUixc/OKVU5UxUD0Xr2l/9Yqksrbnm1eweZ2FQYa329gRTB8mrg4/rURIbCXKUh8p8cTBQ2wDkcxfDE7AzOwZMTLRQBp1gyboF0lUQiI1FXJdFEXmw1HqokMhmJbGROVk4U/9mxWiKbOAtMtffI+ZWixi6CORdloshDy29Qq7TlFAt8+xCfQqLGN8kiq30vcze18pcRY4X6SORdAo2BQFUGiWHCIZgrOBXqvKtEwSI99eOm3BlkOD0xqeB8LntKo7H8r949oAyj7/N3D4GyVs9wKbnOZC/vuKPpXt/Xy/P8u44YOO+tQWiapmmapmmapml+lz8DiXlfldCVWwAAAABJRU5ErkJggg==" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    </head>
+    <body>
+        <div class="navbar">
+            <a href="/">Home</a><a href="/attachments.html">Files</a><a href="#">Top</a>
+            {% if not printing %}
+                <form action="{{ url_for("search") }}" method="get">
+                    <input type="text" name="q" placeholder="Search">
+                    <button type="submit">Search</button>
+                </form>
+            {% endif %}
+        </div>
+        <h1 class="title">
+            {% if device == "desktop" and contact != "IgnoreList" %}
+            Profile information for {{ contact_name.UID }} - {{ contact_name.get("FriendlyName", "None") }}
+            {% else %}
+            Profile information for {{ contact_name.UID }} - {{ contact_name.DisplayName }}
+            {% endif %}
+            {% if avatar %}
+                <img src="{{ url_for('serve', file=avatar) }}"
+                     alt="{{ avatar }}"
+                     title="{{ avatar }}" class="avatar">
+            {% endif %}
+        </h1>
+        <div class="main">
+            <br />
+            <table>
+                {% if contact != "IgnoreList" %}
+                {% for k, v in contacts[contact].items() | sort %}
+                    {% if k in ("MediaInCommon", "ConversationState", "GalleryContentDetails") %}
+                        {% set v = v.items() | map('join', ': ') | join('<br>') %}
+                    {% else %}
+                        {% set v = v %}
+                    {% endif %}
+                    <tr>
+                        <td class="nowrap">{{ k }}</td>
+                        <td class="short">
+                            {% if k in ["AvatarOriginal", "AvatarPreview", "AvatarOther"] and v is not none and links %}
+                                <a href="{{ url_for('serve', file=v) }}" />{{ v }}
+                            {% elif k == "SearchQueries" %}
+                              {% for key, val in v.items() %}
+                                {{ val.DATE }} - {{ val.QUERY }}<br/>
+                              {% endfor %}
+                            {% else %}
+                                {{ v | safe }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                {% endif %}
+            </table>
+        </div>
+        <br />
+    </body>
+</html>

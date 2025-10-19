@@ -1,0 +1,81 @@
+body { margin: 0; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; vertical-align: bottom; }
+.navbar { overflow: hidden; background-color: #4682B4; position: fixed; top: 0; width: 100%; color: white; height: 38px;}
+.navbar a { float:left; display: block; color: white; text-align: center; padding: 10px 10px; text-decoration: none; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+.navbar a:hover { background: white; color: #4682B4; }
+.main { margin-top: 90px; }
+.preview { height: 20%; width: 20%; border-radius: 20px; }
+.title { color: #778899; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; position: fixed; margin-top: -52px; background: white; width: 99.5%; margin-left: 3px; margin-right: 2px; padding-top: 2px; padding-bottom: 2px; border-bottom: 0.2rem solid #4682B4; -webkit-box-shadow: 0px 1px 0px #ccc; -moz-box-shadow: 0px 1px 0px #ccc; box-shadow: 0px 1px 0px #ccc; }
+p { padding-right: 10px; }
+table { border-spacing: 0 6px; border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-top: -31px; width: 99.5%; margin-left: 3px; }
+table.attachment { border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-left: 1px; border-collapse: collapse; }
+
+td { word-break: break-word; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: top; }
+.header { font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; word-break: break-word; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: text-top; border-bottom: 0.1rem solid black; }
+.t1 tr:nth-child(even) { background-color: #f1f1f1; }
+.t2 tr.msg.rcvd { border-spacing: 0 6px; border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-top: -31px; width: 99.5%; margin-left: 3px; color: #777; }
+.t2 tr.msg.sent { border-spacing: 0 6px; border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-top: -31px; width: 99.5%; margin-left: 3px; color: black; }
+.t3 { padding: 0; height: 100%; }
+td.nowrap.normal { white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; }
+td.nowrap.normal.white { color: white; white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: top; }
+td.white { color: white; }
+td.msg { width: 100%; position: static; padding: 8px 15px; vertical-align: top; word-break: break-word; color: white; }
+td.msg.wrap { text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; color: white; }
+td.msg .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; line-height: 1.5; word-break: break-word; }
+td.msg.sent, td.msg.sent.attachment, td.msg.sent.noimg { text-align: right; }
+td.msg.sent .bubble, td.msg.sent.noimg .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #1986da; color: white; line-height: 1.1; text-align: right; }
+td.msg.sent.attachment .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #1986da; color: white; line-height: 1.1; text-align: right; }
+td.msg.sent.fwd .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #87CEEB; color: white; line-height: 1.1; text-align: right; }
+td.msg.sent.myquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #87CEEB; color: white; line-height: 1.1; text-align: right; }
+td.msg.sent.theirquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: right; }
+td.msg.rcvd, td.msg.rcvd.attachment, td.msg.rcvd.noimg, td.msg.other { text-align: left; }
+td.msg.rcvd .bubble, td.msg.rcvd.noimg .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #2fda19; color: white; line-height: 1.1; text-align: left; }
+td.msg.rcvd.attachment .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #2fda19; color: white; line-height: 1.1; text-align: left; vertical-align: top;}
+td.msg.rcvd.fwd .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: left; }
+td.msg.rcvd.myquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #87CEEB; color: white; line-height: 1.1; text-align: left; }
+td.msg.rcvd.theirquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: left; }
+td.msg.other .bubble { background: orange; color: white; }
+td.msg.sent.voip .bubble { display: inline-block; max-width: 70%; box-sizing: border-box; text-align: right; background: orange; color: white; font-weight: bold;}
+td.msg.rcvd.voip .bubble { display: inline-block; max-width: 70%; box-sizing: border-box; text-align: left; background: orange; color: white; font-weight: bold;}
+td a:link { color: black; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+td a:hover { color: green; }
+td a:active { color: black; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+li { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; list-style-type: none; }
+li a:link { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+li a:hover { color: green; }
+li a:active { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+.play { vertical-align: bottom; width: 48px; height: 48px; border-radius: 10px; margin-right: 5px; }
+input[type=text] { width: 10%; margin-top: 8px; border: 1px solid #ccc; border-radius: 4px; margin-left: +2px; }
+input[type=text]:focus, select:focus { border: 1px solid #555; outline: none; }
+@media print {
+  .navbar {
+    display: none;
+    font-family: Arial, sans-serif !important;
+  }
+  .title {
+    position: static;
+    display: block;
+    float: none;
+    margin-top: 0px;
+    padding-bottom: 0px;
+    page-break-after: avoid;
+    font-family: Arial, sans-serif !important;
+  }
+  .main {
+    margin-top: 0;
+  }
+  table {
+    font-family: Arial, sans-serif !important;
+    margin-top: -41px; 
+  }
+  a {
+    pointer-events: none;
+    text-decoration: none;
+    color: inherit;
+  }
+  td.msg .bubble, td.msg.sent .bubble, td.msg.rcvd .bubble, td.msg.sent.attachment .bubble, td.msg.rcvd.attachment .bubble {
+    display: block;
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+}
