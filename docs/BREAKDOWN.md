@@ -1,7 +1,9 @@
 
 # ICQ Data Folders Breakdown
 
-## ICQ Folder
+## Desktop
+
+### ICQ Folder
 
 `logs`: Files containing network logs for activity for the app  
 
@@ -26,7 +28,7 @@
 
 `zdicts`: Empty folder in all samples so far
 
-## 0001 Folder
+### 0001 Folder
 
 `archive`: Folders for each aimId, containing files named `_db*`, `_idx*`, `_ste*`, `_gc*`, `_gs*`, `_mentions`, `_reactions_db`, `_reactions_idx`  
 
@@ -53,6 +55,11 @@
 `search`: Contains folders with uids, and in each a file named "hst". Looks simply like a text file containing words searched for in the chat with that user. Not always present.
 
 `stickers`: Similar to emoji or icons which can be shared or used in a chat
+
+## iOS
+
+Coming Soon
+
 
 ### Notes
 
