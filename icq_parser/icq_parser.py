@@ -33,6 +33,7 @@ except ImportError:
 
 ## TODO: Log Parsing - | grep ^{ | awk -F curl '{print $1}' | grep -v '{"method' | less
 ## TODO: Review im-desktop/core/Voip/libvoip/include/voip/voip3.h - ToPackedString
+## TODO: UI Settings (get_ui_settings)
 
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 ASCII_MAX = 128
@@ -193,6 +194,8 @@ class DesktopParser:
         self.DIALOGS_FILES = []
         self.DIALOG_STATES = {}
         self.DIALOG_STATE_FILES = {}
+        self.DIALOG_UI_FILES = []
+        self.DIALOG_UI_SETTINGS = {}
         self.DRAFT_FILES = {}
         self.DRAFTS = {}
         self.GALLERY_CACHE_FILES = {}
@@ -202,6 +205,7 @@ class DesktopParser:
         self.SEARCH_HISTORY = {}
         self.INFO_CACHE = {}
         self.INFO_CACHE_FILES = []
+        self.LOG_FILES = []
         self.PARK = {}
         self.RAW_TIME = 0
         self.SHARED_FILES = {}
@@ -360,6 +364,8 @@ class DesktopParser:
                         self.AVATARS[img.parent.name] = [str(img)]
             elif file.match("call_log.cache"):
                 self.CALL_LOG_CACHE.append(str(file))
+            elif file.match("*.net.txt"):
+                self.LOG_FILES.append(str(file))
 
     def get_db_content(self):
         if not self.DB_FILES:
@@ -1003,6 +1009,7 @@ class DesktopParser:
                             offset += 8 + chunk[1]
                     content = content[blk_end + 8 :]
         return self.DIALOG_STATES
+
 
     def correlate_data(self):
         for k, v in self.SHARED_FILES.items():
@@ -2532,17 +2539,6 @@ def wait_for_server(url):
     raise RuntimeError("[!] Web server did not appear to start")
 
 
-def install_chromium():
-    if getattr(sys, "frozen", False):
-        py_dir = os.path.join(sys._MEIPASS, "python.exe")
-    else:
-        py_dir = sys.executable
-    try:
-        subprocess.check_call([py_dir, "-m", "playwright", "install", "chromium"])
-    except Exception as exc:
-        raise RuntimeError("[!] Unable to install Chromium Browser") from exc
-
-
 def save_output(content, filename):
     with open(filename, "w", encoding="utf-8") as json_file:
         json.dump(content, json_file)
@@ -2574,9 +2570,6 @@ def main():
         description="ICQ Parser for iOS and Desktop artifacts"
     )
     subparsers = arg_parse.add_subparsers(dest="action", required=True)
-    install_parser = subparsers.add_parser(
-        "install", help="Install Playwright Dependency for PDF printing"
-    )
     process_parsers = subparsers.add_parser(
         "process", help="Process iOS and Desktop ICQ databases"
     )
@@ -2791,12 +2784,6 @@ def main():
         help="generates a log file",
     )
     args = arg_parse.parse_args()
-    if args.action == "install":
-        print(
-            "[-] Attempting to install the chromium headless browser requirement for Playwright"
-        )
-        install_chromium()
-        print("[+] Install complete.")
     if args.action == "process" and args.device == "ios":
         if not os.path.exists(args.source) and not os.path.isdir(args.source):
             arg_parse.error(
