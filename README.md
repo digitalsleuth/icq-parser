@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ICQ Parser
 This tool is designed to provide a web-based view of the contents of the ICQ chat application.
 
@@ -152,3 +153,7 @@ options:
   --log                 generates a log file
 ```
 
+=======
+# icq-parser
+A simple Python / Flask app for parsing mobile ICQ data
+>>>>>>> 0497c10 (Initial commit)
