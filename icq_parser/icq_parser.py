@@ -27,13 +27,19 @@ import magic
 try:
     from icq_parser import icqweb
     from icq_parser.icqweb import build_search_index
+    from icq_parser.icq_enums import STATUS_ENUMS
 except ImportError:
     import icqweb
     from icqweb import build_search_index
+    from icq_enums import STATUS_ENUMS
 
-## TODO: Log Parsing - | grep ^{ | awk -F curl '{print $1}' | grep -v '{"method' | less
+## Indexed length-prefixed records
+## TODO: Output Log Parsing
 ## TODO: Review im-desktop/core/Voip/libvoip/include/voip/voip3.h - ToPackedString
-## TODO: UI Settings (get_ui_settings)
+## TODO: use app-settings, dialogs, dialog-states, not just output them.
+## TODO: core.stg - core_settings_values - core/core_settings.h
+## TODO: include ignorelist as page
+## TODO: Use History ID as Message ID for iOS under get_message
 
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 ASCII_MAX = 128
@@ -206,6 +212,7 @@ class DesktopParser:
         self.INFO_CACHE = {}
         self.INFO_CACHE_FILES = []
         self.LOG_FILES = []
+        self.LOG_CONTENTS = {}
         self.PARK = {}
         self.RAW_TIME = 0
         self.SHARED_FILES = {}
@@ -322,7 +329,17 @@ class DesktopParser:
             "UserType": None,
         }
         # identified through log files and data comparison within iOS ICQ databases
-        self.USER_TYPE = {2: "icq", 3: "interop", 4: "sms", 5: "chat"}
+        self.USER_TYPE = {
+            2: "icq",
+            3: "interop",
+            4: "sms",
+            5: "chat",
+        }
+        self.LOGIN_TYPES = {
+            0: 'password',
+            1: 'phone',
+            2: 'Oauth2',
+        }
 
         for file in folder_path.rglob("*"):
             if file.match("_db*") and file.parent.name in self.DB_FILES:
@@ -366,6 +383,8 @@ class DesktopParser:
                 self.CALL_LOG_CACHE.append(str(file))
             elif file.match("*.net.txt"):
                 self.LOG_FILES.append(str(file))
+            elif file.match("ui2.stg"):
+                self.DIALOG_UI_FILES.append(str(file))            
 
     def get_db_content(self):
         if not self.DB_FILES:
@@ -1010,6 +1029,89 @@ class DesktopParser:
                     content = content[blk_end + 8 :]
         return self.DIALOG_STATES
 
+    def get_ui_settings(self):
+        if not self.DIALOG_UI_FILES:
+            return None
+        for file in self.DIALOG_UI_FILES:
+            offset = 0
+            with open(file, "rb") as f:
+                content = f.read()
+                blk = memoryview(content)
+                blk_end = len(blk)
+                while offset < blk_end:
+                    _, size = struct.unpack_from("<II", blk, offset)
+                    offset += 8
+                    text_idx, text_size = struct.unpack_from("<II", blk, offset)
+                    offset += 8
+                    title = blk[offset:offset + text_size].tobytes().decode("utf-8")
+                    offset += text_size
+                    value_idx, value_size = struct.unpack_from("<II", blk, offset)
+                    if 'splitter' in title:
+                        offset += value_size + 8
+                        continue
+                    if 'favorites_pinned_on_start' in title:
+                        handler = ui_handlers['favorites_pinned_on_start']
+                        uid = title.split('favorites_pinned_on_start')[0]
+                        self.DIALOG_UI_SETTINGS["UID"] = uid
+                        title = 'favorites_pinned_on_start'
+                    else:
+                        handler = ui_handlers[title]
+                    result, offset = handler(self, [value_idx, value_size], blk, offset)
+                    if isinstance(result, str):
+                        result = result.rstrip('\00')
+                    if title == 'login_page_last_login_type':
+                        result = self.LOGIN_TYPES[result]
+                    self.DIALOG_UI_SETTINGS[title] = result
+        return self.DIALOG_UI_SETTINGS
+
+
+    def get_log_content(self):
+        if not self.LOG_FILES:
+            return None
+        ts_dicts = {}
+        method_dicts = {}
+        response_dicts = {}
+        myinfo = {}
+        for file in self.LOG_FILES:
+            with open(file, 'r', encoding='utf-8', errors='replace') as log_file:
+                all_lines = log_file.readlines()
+                num = 0
+                for line in all_lines:
+                    line = line.strip()
+                    num += 1
+                    if line.startswith('{'):
+                        data = line.split('curl_easy_perform')[0]
+                        clean = data.strip('\000')
+                        line_dict = clean[:clean.rfind('}') + 1]
+                        line_dict = line_dict.replace('\r','')
+                        try:
+                            json_dict = json.loads(line_dict)
+                        except json.JSONDecodeError as exc:
+                            if "Expecting ',' delimiter" in str(exc):
+                                try:
+                                    data = line.split("77 data bytes written")[0]
+                                    clean = data.strip() + all_lines[num].split('curl_easy_perform')[0]
+                                    line_dict = clean[:clean.rfind('}') + 1]
+                                    json_dict = json.loads(line_dict)
+                                except:
+                                    continue
+                        if "ts" in json_dict:
+                            ts_dicts[json_dict["ts"]] = json_dict
+                        elif "method" in json_dict:
+                            method_dicts[json_dict["reqId"]] = json_dict
+                        elif "response" in json_dict:
+                            try:
+                                if "ts" in json_dict["response"]["data"]:
+                                    response_dicts[json_dict["response"]["data"]["ts"]] = json_dict
+                                elif "myInfo" in json_dict["response"]["data"]:
+                                    myinfo = json_dict["response"]["data"]["myInfo"]
+                            except:
+                                continue
+        self.LOG_CONTENTS['myInfo'] = myinfo
+        self.LOG_CONTENTS['ts'] = ts_dicts
+        self.LOG_CONTENTS['method'] = method_dicts
+        self.LOG_CONTENTS['response'] = response_dicts
+        return self.LOG_CONTENTS
 
     def correlate_data(self):
         for k, v in self.SHARED_FILES.items():
@@ -1285,6 +1387,36 @@ def read_format_flags(parser, chunk, blk, offset):
     offset += length
     return flags_set, offset
 
+def read_resolution(parser, chunk, blk, offset):
+    results = []
+    resolution = {}
+    length = chunk[1]
+    offset += 8
+    val = 4
+    while val <= length:
+        i = struct.unpack_from('<I', blk[offset : offset + 4])[0]
+        results.append(i)
+        offset += 4
+        val += 4
+    resolution['x'] = results[0]
+    resolution['y'] = results[1]
+    resolution['w'] = results[2]
+    resolution['h'] = results[3]
+    return resolution, offset
+
+def read_event_times(parser, chunk, blk, offset):
+    ## These values are Big Endian
+    results = {}
+    length = chunk[1]
+    offset += 8
+    val = 0
+    while val < length:
+        event, ts = struct.unpack_from('>QQ', blk[offset : offset + 16])
+        event = STATUS_ENUMS[event]
+        results[event] = convert_unix_ts(ts)
+        offset += 16
+        val += 16
+    return results, offset
 
 handlers = {
     # Handler codes sourced from icqdesktop.deprecated/core/archive/history_message.cpp
@@ -1463,7 +1595,7 @@ draft_files_handlers = {
 }
 
 state_handlers = {
-    # core/archive/gallery_cache.cpp ##
+    # core/archive/gallery_cache.cpp
     1: (read_text, "PATCH_VERSION", None),
     2: (read_message_id, "LAST_ENTRY", "STATE"),
     3: (read_value, "LAST_ENTRY_SEQUENCE_NO", None),
@@ -1508,6 +1640,39 @@ dialog_state_handlers = {
     27: (read_text, "MEMBERS_VERSION", None),  # No sample yet.
 }
 
+ui_handlers = {
+    'favorites_pinned_on_start': read_bool,
+    'available_geometry': read_resolution,
+    'desktop_rect': read_resolution,
+    'download_directory_save_as': read_text,
+    'first_run': read_bool,
+    'keep_logged_in': read_bool,
+    'language': read_text,
+    'last_version': read_text,
+    'local_pin_timeout': read_value,
+    'login_page_last_entered_phone': read_text,
+    'login_page_last_entered_uin': read_text,
+    'login_page_last_login_type': read_value,
+    'login_page_need_fill_profile': read_bool,
+    'mac_accounts_migrated': read_bool,
+    'main_window_rect': read_resolution,
+    'microphone': read_text,
+    'mplayer_volume': read_value,
+    'pinned_chats_visible': read_bool,
+    'recents_emojis_v2': read_text,
+    'recents_emojis_v3': read_text,
+    'recents_mini_mode': read_bool,
+    'release_notes_sha1': read_text,
+    'speakers': read_text,
+    'splitter_state': read_unknown,
+    'splitter_state_scale': read_unknown,
+    'stat_last_posted_times': read_event_times,
+    'statuses_user_statuses': read_text,
+    'user_download_directory': read_text,
+    'upload_directory': read_text,
+    'webcam': read_text,
+    'window_maximized': read_bool,
+}
 
 class iOSParser:
     def __init__(self, start_path):
@@ -1907,7 +2072,6 @@ class iOSParser:
         ZMRMESSAGE_hdr, ZMRMESSAGE = split_table(self.AGENT["ZMRMESSAGE"])
         ## archive_idx = ZMRMESSAGE_hdr["ZARCHIVEID"]
         ## orderkey_idx = ZMRMESSAGE_hdr["ZORDERKEY"]
-        ## TODO: Use History ID as Message ID
         ZMRCALLMESSAGE_hdr, ZMRCALLMESSAGE = split_table(self.AGENT["ZMRCALLMESSAGE"])
         ZMRGALLERYENTRY_hdr, ZMRGALLERYENTRY = split_table(
             self.AGENT["ZMRGALLERYENTRY"]
@@ -2402,6 +2566,8 @@ def convert_nsdate_ts(ts):
 
 
 def convert_unix_ts(ts):
+    if len(str(ts)) == 13:
+        ts = ts / 1000
     result = dt.fromtimestamp(ts, timezone.utc).strftime(__fmt__)
     return result
 
@@ -2508,7 +2674,7 @@ def print_to_pdf(base_url, output, logger=None):
         if href and href.startswith("/"):
             full_url = base_url + href
             filename = href.strip("/").replace("/", "_") or "index"
-            if "IgnoreList" in filename:  ## TODO - include ignorelist as page
+            if "IgnoreList" in filename:  
                 continue
             if "_" in filename:
                 split = filename.split("_")
@@ -2946,6 +3112,10 @@ def main():
                     f"Processing messages for {len(dparser.DB_FILES)} users, this may take some time. Please be patient ... "
                 )
             dparser.get_db_content()
+        if dparser.DIALOG_UI_FILES:
+            dparser.get_ui_settings()
+        if dparser.LOG_FILES:
+            dparser.get_log_content()
         dparser.correlate_data()
         outputs = {
             "owner": dparser.INFO_CACHE,
@@ -2958,6 +3128,8 @@ def main():
             "history": dparser.SEARCH_HISTORY,
             "messages": dparser.MESSAGES,
             "contacts": dparser.CONTACT_LIST,
+            "app-settings": dparser.DIALOG_UI_SETTINGS,
+            "log-contents": dparser.LOG_CONTENTS,
         }
         for file, data in outputs.items():
             if data:
