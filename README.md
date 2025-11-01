@@ -1,11 +1,7 @@
-<<<<<<< HEAD
 # ICQ Parser
 This tool is designed to provide a web-based view of the contents of the ICQ chat application.
 
 It also parses the contents into JSON files which can be ingested into other tool-sets.
-
-## Note
-An internet connection will be required on the first run to ensure that the "chromium" browser package is installed by playwright.
 
 ## Usage
 
@@ -152,8 +148,3 @@ options:
                         Location to save the downloaded webpage
   --log                 generates a log file
 ```
-
-=======
-# icq-parser
-A simple Python / Flask app for parsing mobile ICQ data
->>>>>>> 0497c10 (Initial commit)

@@ -10,7 +10,7 @@ icq_parser = ['static/*.png', 'templates/*.html', 'static/*.css']
 
 [project]
 name = "icq-parser"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
     "flask",
     "playwright>=1.45.0",

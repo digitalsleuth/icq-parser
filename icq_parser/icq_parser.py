@@ -41,6 +41,8 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
+__version__ = "1.2"
+__author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 ASCII_MAX = 128
 INDEX_DIVISOR = 62
@@ -79,17 +81,17 @@ class FileSharingIdInfo:
 class FileSharingContentType:
     type_: str
 
-    def is_ptt(self):
-        return self.type_ == "ptt"
+    def is_audio(self):
+        return self.type_.split("-")[0] == "audio"
 
     def is_lottie(self):
-        return self.type_ == "lottie"
+        return self.type_ == "lottie-sticker"
 
     def is_video(self):
-        return self.type_ == "video"
+        return self.type_.split("-")[0] == "video"
 
     def is_image(self):
-        return self.type_ in {"gif", "gif-sticker", "image", "image-sticker"}
+        return self.type_.split("-")[0] == "image"
 
 
 class FileSharingUriParser:
@@ -97,6 +99,10 @@ class FileSharingUriParser:
     Information for how this is used is found in
     im-desktop/gui/main_window/history_control/complex_message/FileSharingUtils.cpp
     and im-desktop/common.shared/constants.h
+    Other type values identified from:
+    https://github.com/mail-ru-im/bot-python
+    and
+    https://github.com/icq-bot/python-icq-bot/tree/1d278cc91f8eba5481bb8d70f80fc74160a40c8b
     """
 
     def __init__(self, file_id: str):
@@ -106,41 +112,82 @@ class FileSharingUriParser:
             raise ValueError(f"[!] Invalid file-sharing URI length: {len(file_id)}")
         self.file_id = file_id
         self.file_type = file_id[0]
+        self.type = self.extract_content_type()
         self.unique_value_one = file_id[5:22]
         self.timestamp = file_id[22:30]
         self.unique_value_two = file_id[30:]
 
     def extract_content_type(self) -> FileSharingContentType:
         c = self.file_type
-        if c == "4":
-            t = "gif"
-        elif c == "5":
-            t = "gif-sticker"
-        elif c in "IJ":
-            t = "ptt"
+        VIDEO = {
+            "8": "REGULAR",
+            "9": "SNAP",
+            "A": "PTS",
+            "B": "PTS_B",
+            "C": "UNKNOWN",
+            "D": "STICKER",
+            "E": "UNKNOWN",
+            "F": "UNKNOWN",
+        }
+        AUDIO = {
+            "G": "REGULAR",
+            "H": "SNAP",
+            "I": "PTT",
+            "J": "PTT",
+            "K": "UNKNOWN",
+            "M": "UNKNOWN",
+            "N": "UNKNOWN",
+        }
+        IMAGE = {
+            "0": "REGULAR",
+            "1": "SNAP",
+            "2": "STICKER",
+            "3": "UNKNOWN",
+            "4": "GIF-ANIMATED",
+            "5": "GIF-ANIMATED-STICKER",
+            "6": "UNKNOWN",
+            "7": "UNKNOWN",
+        }
+        if c in "GHIJKMN":
+            lkup = AUDIO[c]
+            t = f"audio-{lkup.lower()}"
+        elif c in "01234567":
+            lkup = IMAGE[c]
+            t = f"image-{lkup.lower()}"
+        elif c in "89ABCEF":
+            lkup = VIDEO[c]
+            t = f"video-{lkup.lower()}"
         elif c == "L":
             t = "lottie-sticker"
         elif c == "S":
             t = "pdf"
-        elif c in "0134567":
-            t = "image"
-        elif c == "2":
-            t = "image-sticker"
-        elif c in "89ABCEF":
-            t = "video"
-        elif c == "D":
-            t = "video-sticker"
         else:
             t = "unknown"
         return FileSharingContentType(type_=t)
 
-    def decode_duration(self) -> int:
+    def decode_audio_duration(self) -> int:
         """
         Length of PTT files uses characters 1-4, base62 encoded, as duration.
         """
         if len(self.file_id) < 5:
             return None
         part = self.file_id[1:5]
+        duration = 0
+        for i, ch in enumerate(part):
+            value = CHARSET.index(ch)
+            exp = len(CHARSET) * (len(part) - i - 1)
+            if exp > 0:
+                value *= exp
+            duration += value
+        return duration
+
+    def decode_video_duration(self) -> int:
+        """
+        Length of video files uses characters 5-8, base62 encoded, as duration.
+        """
+        if len(self.file_id) < 5:
+            return None
+        part = self.file_id[5:9]
         duration = 0
         for i, ch in enumerate(part):
             value = CHARSET.index(ch)
@@ -178,6 +225,23 @@ class FileSharingUriParser:
             return None
         return ts
 
+    def decode_color(self) -> str:
+        """
+        Color is chars 5 to 7 if type is not video
+        """
+        color = 0
+        if len(self.file_id) < 5:
+            return None
+        if (self.type.is_video() and "pts" not in self.type.type_) or self.type.is_image():
+            color_bits = self.file_id[5:8]
+        elif self.type.is_video() and "pts" in self.type.type_:
+            color_bits = self.file_id[9:12]
+        for ch in color_bits:
+            idx = REVERSE_INDEX_MAP[ord(ch)]
+            if idx == -1:
+                raise ValueError(f"Invalid base62 character: {ch}")
+            color = color * INDEX_DIVISOR + idx
+        return hex(color)
 
 class DesktopParser:
     # im-desktop/common.shared/constants.h
@@ -1211,13 +1275,17 @@ def parse_file_id(uri):
     if len(uri) < 30:
         return [ftype, timestamp, meta]
     file_content = FileSharingUriParser(uri)
-    ftype = file_content.extract_content_type()
+    ftype = file_content.type
     timestamp = file_content.decode_timestamp()
-    if ftype.is_ptt():
-        meta = file_content.decode_duration()
+    if ftype.is_audio():
+        meta = file_content.decode_audio_duration()
     elif ftype.is_image() or ftype.is_video():
         w, h = file_content.decode_size()
-        meta = f"{w} * {h}"
+        color = file_content.decode_color()
+        meta = f"{w} * {h}, color: {color}"
+        if ftype.is_video():
+            duration = file_content.decode_video_duration()
+            meta = f"{meta}, duration: {duration}"
     return [ftype.type_, timestamp, meta]
 
 
@@ -2598,19 +2666,19 @@ def split_table(db_table):
     return idx, data
 
 
-def start_web(IP, load_dir, links=False, printing=False, device=None):
+def start_web(IP, load_dir, links=False, printing=False, device=None, logger=None, index_only=False):
     @icqweb.app.route("/static/<path:filename>")
     def custom_static(filename):
         return send_from_directory(load_dir, filename)
 
     icqweb.app.config["load"] = load_dir
-    with open(f"{load_dir}contacts.json", encoding="utf-8") as json_contacts:
+    with open(f"{load_dir}{os.sep}contacts.json", encoding="utf-8") as json_contacts:
         contacts = json.load(json_contacts)
-    with open(f"{load_dir}messages.json", encoding="utf-8") as json_messages:
+    with open(f"{load_dir}{os.sep}messages.json", encoding="utf-8") as json_messages:
         messages = json.load(json_messages)
-    with open(f"{load_dir}owner.json", encoding="utf-8") as json_owner:
+    with open(f"{load_dir}{os.sep}owner.json", encoding="utf-8") as json_owner:
         owner = json.load(json_owner)
-    with open(f"{load_dir}files.json", encoding="utf-8") as json_files:
+    with open(f"{load_dir}{os.sep}files.json", encoding="utf-8") as json_files:
         files = json.load(json_files)
     icqweb.app.config["CONTACTS"] = contacts
     icqweb.app.config["MESSAGES"] = messages
@@ -2623,10 +2691,27 @@ def start_web(IP, load_dir, links=False, printing=False, device=None):
     icqweb.app.config["PREFERRED_URL_SCHEME"] = "http"
     icqweb.app.config["PRINTING"] = printing
     icqweb.app.config["TESTING"] = False
-    if not printing:
-        icqweb.app.config["SEARCH_INDEX"] = build_search_index(icqweb.app)
+    if not printing and "SEARCH_INDEX" not in icqweb.app.config:
+        if os.path.exists(f"{load_dir}{os.sep}index.icq") and not index_only:
+            with open(f"{load_dir}{os.sep}index.icq", "r", encoding="utf-8") as index_file:
+                icqweb.app.config["SEARCH_INDEX"] = json.load(index_file)
+        else:
+            logger.info("Generating search index ...")
+            icqweb.app.config["SEARCH_INDEX"] = build_search_index(icqweb.app)
+            if index_only:
+                logger.info(f"Saving index to {load_dir}{os.sep}index.icq.")
+                with open(f"{load_dir}{os.sep}index.icq", "w", encoding="utf-8") as index_file:
+                    idx = icqweb.app.config["SEARCH_INDEX"]
+                    json.dump(idx, index_file)
+                if logger:
+                    logger.info(f"{load_dir}{os.sep}index.icq index saved.")
+                return
+    if index_only:
+        return
     cli = sys.modules["flask.cli"]
     cli.show_server_banner = lambda *x: None
+    if logger:
+        logger.info(f"Starting the webserver at http://{IP}:5000")
     icqweb.app.run(host=IP, debug=False, use_reloader=False)
 
 
@@ -2733,7 +2818,7 @@ def log_output(log_path, to_file=False):
 
 def main():
     arg_parse = argparse.ArgumentParser(
-        description="ICQ Parser for iOS and Desktop artifacts"
+        description=f"ICQ Parser for iOS and Desktop artifacts v{__version__}"
     )
     subparsers = arg_parse.add_subparsers(dest="action", required=True)
     process_parsers = subparsers.add_parser(
@@ -3024,6 +3109,15 @@ def main():
             if data:
                 save_output(data, f"{dest_path}{os.sep}{file}.json")
                 logger.info(f"{dest_path}{os.sep}{file}.json saved.")
+        start_web(
+            "127.0.0.1",
+            dest_path,
+            links=True,
+            printing=False,
+            device=args.device,
+            logger=logger,
+            index_only=True,
+        )
         end = dt.now().strftime(__fmt__)
         time_taken = str(
             timedelta(
@@ -3135,6 +3229,15 @@ def main():
             if data:
                 save_output(data, f"{dest_path}{os.sep}{file}.json")
                 logger.info(f"{dest_path}{os.sep}{file}.json saved.")
+        start_web(
+            "127.0.0.1",
+            dest_path,
+            links=True,
+            printing=False,
+            device=args.device,
+            logger=logger,
+            index_only=True,
+        )
         end = dt.now().strftime(__fmt__)
         time_taken = str(
             timedelta(
@@ -3179,7 +3282,7 @@ def main():
                 logger.info(f"Starting the webserver at {url}")
                 flask_thread = threading.Thread(
                     target=start_web,
-                    args=(args.ip, load_path, args.links, printing, args.device),
+                    args=(args.ip, load_path, args.links, printing, args.device, logger),
                     daemon=True,
                 )
                 flask_thread.start()
@@ -3193,14 +3296,13 @@ def main():
         else:
             url = f"http://{args.ip}:5000"
             try:
-                logger.info("Indexing content for search ...")
-                logger.info(f"Starting the webserver at {url}")
                 start_web(
                     args.ip,
                     load_path,
                     links=args.links,
                     printing=args.debug,
                     device=args.device,
+                    logger=logger,
                 )
             except Exception as e:
                 arg_parse.error(f"[!] Unable to start the web server: {e}")
@@ -3230,10 +3332,9 @@ def main():
         logger.info(f"Loading json files from {source_path}.")
         try:
             saving = True
-            logger.info(f"Starting the webserver at {url}")
             flask_thread = threading.Thread(
                 target=start_web,
-                args=(args.ip, source_path, args.links, saving, args.device),
+                args=(args.ip, source_path, args.links, saving, args.device, logger),
                 daemon=True,
             )
             flask_thread.start()

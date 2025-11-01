@@ -143,29 +143,32 @@ def build_search_index(icqapp):
     index = []
 
     with icqapp.test_client() as client:
-        resp = client.get("/")
+        url = "/"
+        resp = client.get(f"{url}")
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.data, "html.parser")
-            text = soup.get_text(separator=" ", strip=True)
-            index.append({"url": "/", "content": clean_text(text)})
+            text = clean_text(soup.get_text(separator=" ", strip=True))
+            index.append({"url": f"{url}", "content": text})
         for contact_id, _ in icqapp.config.get("CONTACTS", {}).items():
-            resp = client.get(f"/{contact_id}")
+            url = f"/{contact_id}"
+            resp = client.get(url)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.data, "html.parser")
-                text = soup.get_text(" ", strip=True)
-                index.append({"url": f"/{contact_id}", "content": clean_text(text)})
-            resp = client.get(f"/contacts/{contact_id}")
+                text = clean_text(soup.get_text(" ", strip=True))
+                index.append({"url": url, "content": text})
+            url = f"/contact/{contact_id}"
+            resp = client.get(url)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.data, "html.parser")
-                text = soup.get_text(" ", strip=True)
+                text = clean_text(soup.get_text(" ", strip=True))
                 index.append(
-                    {"url": f"/contacts/{contact_id}", "content": clean_text(text)}
+                    {"url": url, "content": text}
                 )
         resp = client.get("/attachments.html")
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.data, "html.parser")
-            text = soup.get_text(" ", strip=True)
-            index.append({"url": "/attachments.html", "content": clean_text(text)})
+            text = clean_text(soup.get_text(" ", strip=True))
+            index.append({"url": "/attachments.html", "content": text})
         for contact_id, msgs in icqapp.config.get("MESSAGES", {}).items():
             for _, msg_obj in msgs.items():
                 body = ""
@@ -180,7 +183,8 @@ def build_search_index(icqapp):
                             body = v
                             break
                 if body:
-                    index.append({"url": f"/{contact_id}", "content": clean_text(body)})
+                    body = clean_text(body)
+                    index.append({"url": f"/{contact_id}", "content": body})
         files = icqapp.config.get("FILES", {})
         files_texts = []
         if isinstance(files, dict):
