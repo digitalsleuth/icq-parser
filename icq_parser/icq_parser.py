@@ -41,32 +41,32 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.2"
+__version__ = "1.2.1"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
-ASCII_MAX = 128
-INDEX_DIVISOR = 62
-CHARSET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 PDFS = []
 
 
-def get_reverse_index_map():
-    # Maps ASCII char to index 0..61, like a manual Base62 conversion
-    map_ = [-1] * ASCII_MAX
-    index = 0
-    for ch in range(ord("0"), ord("9") + 1):
-        map_[ch] = index
-        index += 1
-    for ch in range(ord("a"), ord("z") + 1):
-        map_[ch] = index
-        index += 1
-    for ch in range(ord("A"), ord("Z") + 1):
-        map_[ch] = index
-        index += 1
-    return map_
+class Base62:
+    CHARSET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    BASE = len(CHARSET)
 
+    @classmethod
+    def encode(cls, num: int) -> str:
+        if num == 0:
+            return cls.CHARSET[0]
+        encoded = []
+        while num > 0:
+            num, rem = divmod(num, cls.BASE)
+            encoded.append(cls.CHARSET[rem])
+        return ''.join(reversed(encoded))
 
-REVERSE_INDEX_MAP = get_reverse_index_map()
+    @classmethod
+    def decode(cls, s: str) -> int:
+        num = 0
+        for ch in s:
+            num = num * cls.BASE + cls.CHARSET.index(ch)
+        return num
 
 
 @dataclass
@@ -172,14 +172,8 @@ class FileSharingUriParser:
         if len(self.file_id) < 5:
             return None
         part = self.file_id[1:5]
-        duration = 0
-        for i, ch in enumerate(part):
-            value = CHARSET.index(ch)
-            exp = len(CHARSET) * (len(part) - i - 1)
-            if exp > 0:
-                value *= exp
-            duration += value
-        return duration
+        duration = Base62.decode(part)
+        return str(duration)
 
     def decode_video_duration(self) -> int:
         """
@@ -188,14 +182,8 @@ class FileSharingUriParser:
         if len(self.file_id) < 5:
             return None
         part = self.file_id[5:9]
-        duration = 0
-        for i, ch in enumerate(part):
-            value = CHARSET.index(ch)
-            exp = len(CHARSET) * (len(part) - i - 1)
-            if exp > 0:
-                value *= exp
-            duration += value
-        return duration
+        duration = Base62.decode(part)
+        return str(duration)
 
     def decode_size(self):
         """
@@ -204,14 +192,8 @@ class FileSharingUriParser:
         """
         if len(self.file_id) < 5:
             return None
-
-        def decode_pair(ch0, ch1):
-            index0 = REVERSE_INDEX_MAP[ord(ch0)]
-            index1 = REVERSE_INDEX_MAP[ord(ch1)]
-            return index0 * INDEX_DIVISOR + index1
-
-        width = decode_pair(self.file_id[1], self.file_id[2])
-        height = decode_pair(self.file_id[3], self.file_id[4])
+        width = Base62.decode(self.file_id[1:3])
+        height = Base62.decode(self.file_id[3:5])
         return width, height
 
     def decode_timestamp(self) -> str:
@@ -228,6 +210,7 @@ class FileSharingUriParser:
     def decode_color(self) -> str:
         """
         Color is chars 5 to 7 if type is not video
+        Otherwise it's 9 to 11 if it is
         """
         color = 0
         if len(self.file_id) < 5:
@@ -236,11 +219,7 @@ class FileSharingUriParser:
             color_bits = self.file_id[5:8]
         elif self.type.is_video() and "pts" in self.type.type_:
             color_bits = self.file_id[9:12]
-        for ch in color_bits:
-            idx = REVERSE_INDEX_MAP[ord(ch)]
-            if idx == -1:
-                raise ValueError(f"Invalid base62 character: {ch}")
-            color = color * INDEX_DIVISOR + idx
+        color = Base62.decode(color_bits)
         return hex(color)
 
 class DesktopParser:
