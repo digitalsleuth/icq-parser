@@ -41,7 +41,7 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.2.1"
+__version__ = "1.2.2"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 PDFS = []
@@ -383,6 +383,24 @@ class DesktopParser:
             1: 'phone',
             2: 'Oauth2',
         }
+        self.CAPABILITIES = {
+            "094613504c7f11d18222444553540000": "VOIP_VOICE",
+            "094613514c7f11d18222444553540000": "VOIP_VIDEO",
+            "094613564c7f11d18222444553540000": "VOIP_RINGING",
+            "094613503c7f11d18222444553540000": "FOCUS_GROUP_CALLS",
+            "094613434c7f11d18222444553540000": "FILETRANSFER",
+            "094613534c7f11d18222444553540000": "UNIQ_REQ_ID",
+            "094613544c7f11d18222444553540000": "EMOJI",
+            "0946135b4c7f11d18222444553540000": "MENTIONS",
+            "094613594c7f11d18222444553540000": "MAIL_NOTIFICATIONS",
+            "0946135a4c7f11d18222444553540000": "INTRO_DLG_STATE",
+            "0946135c4c7f11d18222444553540000": "CHAT_HEADS",
+            "0946135e4c7f11d18222444553540000": "GALLERY_NOTIFY",
+            "1f99494e76cbc880215d6aeab8e42268": "GROUP_SUBSCRIPTION",
+            "0946135d4c7f11d18222444553540000": "RECENT_CALLS",
+            "a20c362cd4944b6ea3d1e77642201fd8": "REACTIONS",
+            "2381B328-7AA4-4979-A9A2-573EA646B5DE": "CUSTOM_STATUSES",
+        }
 
         for file in folder_path.rglob("*"):
             if file.match("_db*") and file.parent.name in self.DB_FILES:
@@ -676,6 +694,9 @@ class DesktopParser:
                         self.CONTACT_LIST[b_id]["Capabilities"] = buddy.get(
                             "capabilities", None
                         )
+                        if self.CONTACT_LIST[b_id]["Capabilities"] is not None:
+                            for cap in self.CONTACT_LIST[b_id]["Capabilities"]:
+                                self.CONTACT_LIST[b_id]["Capabilities"][self.CONTACT_LIST[b_id]["Capabilities"].index(cap)] = f"{self.CAPABILITIES.get(cap)} - {cap}"
                         if "@chat.agent" in b_id:
                             self.CONTACT_LIST[b_id]["ConversationType"] = "GROUP CHAT"
                         else:

@@ -18,6 +18,7 @@ td { word-break: break-word; text-align: left; padding: 0.2rem; padding-right: 0
 .t3 { padding: 0; height: 100%; }
 td.nowrap.normal { white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; }
 td.nowrap.normal.white { color: white; white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: top; }
+td.normal.white { color: white; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: top; }
 td.white { color: white; }
 td.msg { width: 100%; position: static; padding: 8px 15px; vertical-align: top; word-break: break-word; color: white; }
 td.msg.wrap { text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; color: white; }
@@ -33,7 +34,7 @@ td.msg.rcvd .bubble, td.msg.rcvd.noimg .bubble { display: inline-block; max-widt
 td.msg.rcvd.attachment .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #2fda19; color: white; line-height: 1.1; text-align: left; vertical-align: top;}
 td.msg.rcvd.fwd .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: left; }
 td.msg.rcvd.myquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #87CEEB; color: white; line-height: 1.1; text-align: left; }
-td.msg.rcvd.theirquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: left; }
+td.msg.rcvd.theirquote .bubble { display: inline-block; max-width: 70%; padding: 8px 12px; border-radius: 20px; background: #3CB371; color: white; line-height: 1.1; text-align: left; overflow-wrap: break-word;}
 td.msg.other .bubble { background: orange; color: white; }
 td.msg.sent.voip .bubble { display: inline-block; max-width: 70%; box-sizing: border-box; text-align: right; background: orange; color: white; font-weight: bold;}
 td.msg.rcvd.voip .bubble { display: inline-block; max-width: 70%; box-sizing: border-box; text-align: left; background: orange; color: white; font-weight: bold;}

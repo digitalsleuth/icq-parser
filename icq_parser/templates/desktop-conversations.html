@@ -104,7 +104,7 @@
                                                 {% for key, val in v.MESSAGE.items() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="nowrap normal white">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white">{{ key }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
@@ -128,7 +128,7 @@
                                 {% endif %}
                                 <tr class="msg sent">
                                     <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
-                                    <td class="nowrap normal">{{ v.UID }}</td>
+                                    <td class="nowrap normal">{{ owner.UID }}</td>
                                     {% if "SharedContentDetails" in v %}
                                         {% set class = "msg sent attachment" %}
                                     {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is true %}
@@ -174,7 +174,7 @@
                                                 {% for key, val in v.MESSAGE.items() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="nowrap normal white">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white">{{ key }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
