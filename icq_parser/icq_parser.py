@@ -41,7 +41,7 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 PDFS = []
@@ -231,6 +231,7 @@ class DesktopParser:
         self.msg = None
         self.uid = None
         self.OWNER_UID = None
+        self.CHAT_UID = None
         self.MESSAGE_ID = 0
         self.MESSAGES = {}
         self.AVATARS = {}
@@ -592,7 +593,7 @@ class DesktopParser:
                 file_type = magic.from_file(file)
             except ValueError:
                 return None
-            if file_type.startswith("ASCII"):
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
                 with open(file, encoding="utf-8") as f:
                     json_data = json.load(f)
                     self.INFO_CACHE["NICKNAME"] = json_data["info"]["nick"]
@@ -1069,6 +1070,8 @@ class DesktopParser:
                                 while offset + 8 <= len(blk):
                                     chunk = struct.unpack_from("<II", blk, offset)
                                     handler_id = chunk[0]
+                                    if handler_id == 20:
+                                        self.CHAT_UID = uid
                                     if handler_id in handlers:
                                         value, offset = handlers[handler_id][0](
                                             self, chunk, blk, offset
@@ -1207,18 +1210,18 @@ class DesktopParser:
                 self.CONTACT_LIST[k]["GalleryContentDetails"] = self.GALLERY_STATE[k]
         msgs_sent = msgs_rcvd = total_sent = total_rcvd = 0
         for uid, msgs in self.MESSAGES.items():
-            for msg, content in msgs.items():
-                if "DIRECTION" in content["MESSAGE"]:
-                    if content["MESSAGE"]["DIRECTION"] == "OUTGOING":
-                        msgs_sent += 1
-                    elif content["MESSAGE"]["DIRECTION"] == "INCOMING":
-                        msgs_rcvd += 1
             if uid not in self.CONTACT_LIST:
                 self.CONTACT_LIST[uid] = {
                     "MESSAGE_FROM_NON_CONTACT": uid,
                     "UID": uid,
                     "AIMID": uid,
                 }
+            for msg, content in msgs.items():
+                if "DIRECTION" in content["MESSAGE"]:
+                    if content["MESSAGE"]["DIRECTION"] == "OUTGOING":
+                        msgs_sent += 1
+                    elif content["MESSAGE"]["DIRECTION"] == "INCOMING":
+                        msgs_rcvd += 1
             self.CONTACT_LIST[uid]["MessagesSent"] = msgs_sent
             self.CONTACT_LIST[uid]["MessagesReceived"] = msgs_rcvd
             self.CONTACT_LIST[uid]["MessagesTotal"] = msgs_sent + msgs_rcvd
@@ -1229,7 +1232,10 @@ class DesktopParser:
         self.INFO_CACHE["TOTAL_RCVD"] = total_rcvd
         self.INFO_CACHE["TOTAL_ALL"] = total_sent + total_rcvd
         for uid, details in self.DIALOG_STATES.items():
-            self.CONTACT_LIST[uid]["ConversationState"] = details
+            if uid not in self.CONTACT_LIST:
+                self.CONTACT_LIST[uid] = {"ConversationState": details}
+            else:
+                self.CONTACT_LIST[uid]["ConversationState"] = details
         for uid, content in self.SHARED_FILES.items():
             if uid in self.MESSAGES:
                 msgs_data = self.MESSAGES[uid]
@@ -1392,6 +1398,38 @@ def read_unknown(parser, chunk, blk, offset):
     return None, offset
 
 
+def read_heads(parser, chunk, blk, offset):
+    index, blk_size = chunk
+    offset += 8
+    heads_block = memoryview(blk)[offset: offset + blk_size]
+    spacer, head_size = struct.unpack_from("<II", blk, offset)
+    offset += 8
+    blk_size -= 8
+    count = 1
+    while blk_size > 0:
+        while head_size > 0:
+            item_chunk = struct.unpack_from("<II", blk, offset )
+            handler_id = item_chunk[0]
+            item_size = item_chunk[1]
+            head_size -= item_size + 8
+            blk_size -= item_size + 8
+            if handler_id in dialog_state_handlers:
+                value, offset = dialog_state_handlers[handler_id][0](
+                    parser, item_chunk, blk, offset
+                )
+                key = dialog_state_handlers[handler_id][1]
+                dest = dialog_state_handlers[handler_id][2]
+                if dest is None:
+                    continue
+                parser.DIALOG_STATES[parser.CHAT_UID][f"{key}_{count}"] = value
+        count += 1
+        if blk_size != 0:
+            spacer, head_size = struct.unpack_from("<II", blk, offset)
+            blk_size -= 8
+            offset += 8
+    return None, offset
+
+
 def read_chat_members(_, chunk, blk, offset):
     length = chunk[1]
     offset += 8
@@ -1510,8 +1548,8 @@ handlers = {
     # 17 is file sharing outgoing but is no longer used
     18: (read_text, "FILE_SHARING_URI", "MESSAGE"),
     19: (read_text, "FILE_SHARING_LOCAL_PATH", "MESSAGE"),
-    # 20 is file sharing upload ID but is no longer used
-    20: (read_unknown, "FILE_SHARING_UPLOAD_ID", None),
+    # 20 is file sharing upload ID but is no longer used. Now used in dlg_state for heads
+    20: (read_heads, "CHAT_HEADS", None),
     21: (read_text, "SENDER_FRIENDLY_NAME", "MESSAGE"),
     22: (read_size, "CHAT_EVENT_BLOCK_SIZE", None),
     23: (read_lookup_value, "CHAT_EVENT_TYPE", "MESSAGE"),
@@ -1573,7 +1611,7 @@ handlers = {
     79: (read_text, "LONGITUDE", "MESSAGE"),
     80: (read_bool, "CHAT_IS_CHANNEL", "MESSAGE"),
     81: (read_size, "POLL_BLK_SIZE", None),
-    82: (read_value, "POLL_ID", "MESSAGE"),
+    82: (read_text, "POLL_ID", "MESSAGE"),
     83: (read_text, "POLL_ANSWER", "MESSAGE"),
     84: (read_value, "POLL_TYPE", "MESSAGE"),
     85: (read_text, "CHAT_EVENT_NEW_CHAT_STAMP", "MESSAGE"),
@@ -1698,9 +1736,9 @@ dialog_state_handlers = {
     17: (read_unknown, "PINNED_MESSAGE", None),  # No sample yet
     18: (read_bool, "ATTENTION", None),  # No sample yet
     19: (read_bool, "SUSPICIOUS", None),  # No sample yet
-    20: (read_unknown, "HEADS", None),  # No sample yet
+    20: (read_size, "HEADS_SIZE", None),
     21: (read_text, "HEAD_AIMID", "DIALOG_STATE"),
-    22: (read_size, "HEAD_FRIENDLY_BLOCK_SIZE", None),
+    22: (read_text, "HEAD_FRIENDLY_NAME", "DIALOG_STATE"),
     23: (read_message_id, "LAST_READ_MENTION", "DIALOG_STATE"),
     24: (read_bool, "STRANGER", "DIALOG_STATE"),  # No sample yet
     25: (read_text, "INFO_VERSION", None),  # Validate
