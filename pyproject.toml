@@ -10,7 +10,7 @@ icq_parser = ['static/*.png', 'templates/*.html', 'static/*.css']
 
 [project]
 name = "icq-parser"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
     "flask",
     "playwright>=1.45.0",
@@ -18,6 +18,8 @@ dependencies = [
     "pypdf",
 	"requests",
 	"pywebcopy",
+	"selenium",
+	"six",
     "python-magic-bin; sys_platform == 'win32' or sys_platform == 'darwin'",
     "python-magic; sys_platform != 'win32' and sys_platform != 'darwin'"
 ]

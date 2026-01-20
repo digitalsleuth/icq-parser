@@ -9,20 +9,26 @@ import plistlib
 import ipaddress
 import threading
 import time
-import subprocess
 import struct
 import logging
+import io
+import asyncio
+import gc
+import re
+import hashlib
+import urllib.robotparser
 from pathlib import Path
 from datetime import datetime as dt, timezone, timedelta
 from dataclasses import dataclass
 from string import hexdigits
 import requests
 from flask import send_from_directory
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from pypdf import PdfWriter
 from pywebcopy import save_website
 import magic
+from PIL import Image
 
 try:
     from icq_parser import icqweb
@@ -41,7 +47,7 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.2.3"
+__version__ = "1.3.0"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 PDFS = []
@@ -235,6 +241,8 @@ class DesktopParser:
         self.MESSAGE_ID = 0
         self.MESSAGES = {}
         self.AVATARS = {}
+        self.CACHE_DIR = None
+        self.CACHE_FILES = {}
         self.CALL_LOG_CACHE = []
         self.CALL_LOG = {}
         self.CONTACT_LIST = {}
@@ -248,6 +256,8 @@ class DesktopParser:
         self.DIALOG_UI_SETTINGS = {}
         self.DRAFT_FILES = {}
         self.DRAFTS = {}
+        self.FAVORITE_FILES = []
+        self.FAVORITES = {}
         self.GALLERY_CACHE_FILES = {}
         self.GALLERY_STATE_FILES = {}
         self.GALLERY_STATE = {}
@@ -260,6 +270,7 @@ class DesktopParser:
         self.PARK = {}
         self.RAW_TIME = 0
         self.SHARED_FILES = {}
+        self.URL_METADATA = {}
         self.DIRECTION = {True: "OUTGOING", False: "INCOMING"}
         self.VOIP_DIRECTION = {0: "OUTGOING", 1: "INCOMING"}
         self.VERBOSE = False
@@ -401,6 +412,7 @@ class DesktopParser:
             "0946135d4c7f11d18222444553540000": "RECENT_CALLS",
             "a20c362cd4944b6ea3d1e77642201fd8": "REACTIONS",
             "2381B328-7AA4-4979-A9A2-573EA646B5DE": "CUSTOM_STATUSES",
+            "2381b3287aa44979a9a2573ea646b5de": "CUSTOM_STATUSES",
         }
 
         for file in folder_path.rglob("*"):
@@ -446,7 +458,11 @@ class DesktopParser:
             elif file.match("*.net.txt"):
                 self.LOG_FILES.append(str(file))
             elif file.match("ui2.stg"):
-                self.DIALOG_UI_FILES.append(str(file))            
+                self.DIALOG_UI_FILES.append(str(file))
+            elif file.match("cache2") and file.parent.name == "favorites":
+                self.FAVORITE_FILES.append(str(file))
+            elif file.match("content.cache") and os.path.isdir(file):
+                self.CACHE_DIR = str(file)
 
     def get_db_content(self):
         if not self.DB_FILES:
@@ -810,10 +826,13 @@ class DesktopParser:
                         dest = f"CALL_LOG_{key}"
                         if not self.VERBOSE and value == "":  ##
                             continue
+                        if handler_id == 1 and value is not None:
+                            self.MESSAGE_ID = value
+                        if handler_id == 13 and value is None:
+                            continue
                         if self.MESSAGE_ID not in self.CALL_LOG:
                             self.CALL_LOG[self.MESSAGE_ID] = {}
-                        self.CALL_LOG[self.MESSAGE_ID][dest] = {}
-                        self.CALL_LOG[self.MESSAGE_ID][dest][key] = value
+                        self.CALL_LOG[self.MESSAGE_ID][dest] = value
                         if handler_id == 2:
                             self.CALL_LOG[self.MESSAGE_ID][dest]["DIRECTION"] = (
                                 self.DIRECTION[value["OUTGOING"]]
@@ -839,14 +858,6 @@ class DesktopParser:
         return self.DIALOGS
 
     def get_shared_files(self):
-        MEDIA_TYPES = {
-            "FILES": 0,
-            "IMAGES": 0,
-            "LINKS": 0,
-            "PTT": 0,
-            "VIDEOS": 0,
-            "OTHER": 0,
-        }
         MSG_ID = None
         if not self.GALLERY_CACHE_FILES:
             return None
@@ -1106,9 +1117,8 @@ class DesktopParser:
                 blk = memoryview(content)
                 blk_end = len(blk)
                 while offset < blk_end:
-                    _, size = struct.unpack_from("<II", blk, offset)
                     offset += 8
-                    text_idx, text_size = struct.unpack_from("<II", blk, offset)
+                    _, text_size = struct.unpack_from("<II", blk, offset)
                     offset += 8
                     title = blk[offset:offset + text_size].tobytes().decode("utf-8")
                     offset += text_size
@@ -1156,7 +1166,7 @@ class DesktopParser:
                         except json.JSONDecodeError as exc:
                             if "Expecting ',' delimiter" in str(exc):
                                 try:
-                                    data = line.split("77 data bytes written")[0]
+                                    data = re.sub(r"\d{2} data bytes written\n?", '', line)
                                     clean = data.strip() + all_lines[num].split('curl_easy_perform')[0]
                                     line_dict = clean[:clean.rfind('}') + 1]
                                     json_dict = json.loads(line_dict)
@@ -1174,13 +1184,33 @@ class DesktopParser:
                                     myinfo = json_dict["response"]["data"]["myInfo"]
                             except:
                                 continue
-        self.LOG_CONTENTS['myInfo'] = myinfo
-        self.LOG_CONTENTS['ts'] = ts_dicts
-        self.LOG_CONTENTS['method'] = method_dicts
-        self.LOG_CONTENTS['response'] = response_dicts
+        self.LOG_CONTENTS['my_info'] = myinfo
+        self.LOG_CONTENTS['user_activity'] = ts_dicts
+        self.LOG_CONTENTS['app_actions'] = method_dicts
+        self.LOG_CONTENTS['server_communication'] = response_dicts
         return self.LOG_CONTENTS
 
-    def correlate_data(self):
+    def get_favorites(self):
+        if not self.FAVORITE_FILES:
+            return None
+        for file in self.FAVORITE_FILES:
+            try:
+                file_type = magic.from_file(file)
+            except ValueError:
+                return None
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
+                with open(file, encoding="utf-8") as f:
+                    json_data = json.load(f)
+                for aimid in json_data["favorites"]:
+                    self.FAVORITES[aimid["aimId"]] = {}
+                    self.FAVORITES[aimid["aimId"]]["friendlyName"] = aimid["friendly"]
+                    self.FAVORITES[aimid["aimId"]]["converted_time"] = convert_unix_ts(aimid["time"])
+                    self.FAVORITES[aimid["aimId"]]["unix_time"] = aimid["time"]
+                    self.FAVORITES[aimid["aimId"]]["official"] = aimid["official"]
+        return self.FAVORITES
+
+
+    def correlate_data(self): # DesktopParser
         for k, v in self.SHARED_FILES.items():
             num_shared_items = len(v)
             self.SHARED_FILES[k]["MediaTypes"] = self.MEDIA_TYPES.copy()
@@ -1210,12 +1240,19 @@ class DesktopParser:
                 self.CONTACT_LIST[k]["GalleryContentDetails"] = self.GALLERY_STATE[k]
         msgs_sent = msgs_rcvd = total_sent = total_rcvd = 0
         for uid, msgs in self.MESSAGES.items():
+            if "@chat.agent" in uid:
+                conversation_type = "GROUP CHAT"
+            else:
+                conversation_type = "PRIVATE"
             if uid not in self.CONTACT_LIST:
                 self.CONTACT_LIST[uid] = {
                     "MESSAGE_FROM_NON_CONTACT": uid,
                     "UID": uid,
                     "AIMID": uid,
+                    "ConversationType": conversation_type,
                 }
+            if "ConversationType" not in self.CONTACT_LIST[uid]:
+                self.CONTACT_LIST[uid]["ConversationType"] = conversation_type
             for msg, content in msgs.items():
                 if "DIRECTION" in content["MESSAGE"]:
                     if content["MESSAGE"]["DIRECTION"] == "OUTGOING":
@@ -1232,10 +1269,19 @@ class DesktopParser:
         self.INFO_CACHE["TOTAL_RCVD"] = total_rcvd
         self.INFO_CACHE["TOTAL_ALL"] = total_sent + total_rcvd
         for uid, details in self.DIALOG_STATES.items():
+            if "@chat.agent" in uid:
+                conversation_type = "GROUP CHAT"
+            else:
+                conversation_type = "PRIVATE"            
             if uid not in self.CONTACT_LIST:
-                self.CONTACT_LIST[uid] = {"ConversationState": details}
+                self.CONTACT_LIST[uid] = {
+                    "ConversationState": details,
+                    "ConversationType": conversation_type,
+                }
             else:
                 self.CONTACT_LIST[uid]["ConversationState"] = details
+                if "ConversationType" not in self.CONTACT_LIST[uid]:
+                    self.CONTACT_LIST[uid]["ConversationType"] = conversation_type
         for uid, content in self.SHARED_FILES.items():
             if uid in self.MESSAGES:
                 msgs_data = self.MESSAGES[uid]
@@ -1246,35 +1292,242 @@ class DesktopParser:
                         ]
         for uid, content in self.MESSAGES.items():
             for msg_id, msg in content.items():
-                if (
-                    "SharedContentDetails" not in msg
-                    and "TEXT" in msg["MESSAGE"]
-                    and msg["MESSAGE"]["TEXT"].startswith("hxxps://files.icq.net")
-                ):
-                    uri_metadata = {}
-                    uri = msg["MESSAGE"]["TEXT"].split("/get/")[1]
-                    ftype, ftime, fsize = parse_file_id(uri)
-                    uri_metadata["URI_DECODED_CONTENT_TYPE"] = ftype
-                    uri_metadata["URI_DECODED_CONTENT_TIMESTAMP"] = ftime
-                    uri_metadata["URI_DECODED_CONTENT_SIZE"] = fsize
-                    self.MESSAGES[uid][msg_id]["SharedContentDetails"] = {
-                        "URI_DECODED_METADATA": uri_metadata
+                if "SharedContentDetails" in msg and "URI_DECODED_METADATA" in msg["SharedContentDetails"]:
+                    continue
+                for field in ("TEXT", "QUOTE_TEXT", "QUOTE_URL", "URL"):
+                    if field in msg["MESSAGE"] and msg["MESSAGE"][field].startswith("hxxps://files.icq.net"):
+                        uri = msg["MESSAGE"][field].split("/get/")[1]
+                        ftype, ftime, fsize = parse_file_id(uri)
+                        self.MESSAGES[uid][msg_id]["SharedContentDetails"] = {
+                            "URI_DECODED_METADATA": {
+                                "URI_DECODED_CONTENT_TYPE": ftype,
+                                "URI_DECODED_CONTENT_TIMESTAMP": ftime,
+                                "URI_DECODED_CONTENT_SIZE": fsize
+                            }
+                        }
+                        break
+        if not os.path.exists(self.CACHE_DIR):
+            return None
+        self.CACHE_FILES = get_filenames(self.CACHE_DIR)
+        if self.CACHE_FILES is not None:
+            file_matches = self.get_content_matches()
+            if file_matches:
+                for uid, message_data in file_matches.items():
+                    for message_id, data_match in message_data.items():
+                        if "SharedContentDetails" not in self.MESSAGES[uid][message_id]:
+                            self.MESSAGES[uid][message_id]["SharedContentDetails"] = {}
+                        self.MESSAGES[uid][message_id]["SharedContentDetails"]["SHARED_CONTENT_FILE_METADATA"] = data_match
+        CACHE_HASHES = get_hashes(self.CACHE_DIR)
+        JSON_METADATA, self.URL_METADATA, related_dirs = get_json_contents(self.CACHE_DIR)
+        MD5_LOOKUP = {v['MD5']: (k, v) for k, v in JSON_METADATA.items()}
+        hash_matches = []
+        for filename, md5_hash in CACHE_HASHES.items():
+            if md5_hash in MD5_LOOKUP:
+                cache_filename, data = MD5_LOOKUP[md5_hash]
+                hash_matches.append({
+                    'LOCAL_FILENAME': filename,
+                    'METADATA_SOURCE': cache_filename,
+                    'MD5': md5_hash,
+                    'DATA': data
+                })
+        FILE_LOOKUP = {}
+        for uid, message_data in file_matches.items():
+            for message_id, file_data in message_data.items():
+                for filename, file_meta in file_data.items():
+                    FILE_LOOKUP[filename] = {
+                        'UID': uid,
+                        'MESSAGE_ID': message_id,
+                        'FILENAME': filename,
+                        'FILE_META': file_meta,
                     }
-                if (
-                    "SharedContentDetails" not in msg
-                    and "QUOTE_TEXT" in msg["MESSAGE"]
-                    and msg["MESSAGE"]["QUOTE_TEXT"].startswith("hxxps://files.icq.net")
-                ):
-                    uri_metadata = {}
-                    uri = msg["MESSAGE"]["QUOTE_TEXT"].split("/get/")[1]
-                    ftype, ftime, fsize = parse_file_id(uri)
-                    uri_metadata["URI_DECODED_CONTENT_TYPE"] = ftype
-                    uri_metadata["URI_DECODED_CONTENT_TIMESTAMP"] = ftime
-                    uri_metadata["URI_DECODED_CONTENT_SIZE"] = fsize
-                    self.MESSAGES[uid][msg_id]["SharedContentDetails"] = {
-                        "URI_DECODED_METADATA": uri_metadata
-                    }
+        for hash_match in hash_matches:
+            if hash_match["METADATA_SOURCE"] in FILE_LOOKUP:
+                msg_data = FILE_LOOKUP[hash_match["METADATA_SOURCE"]]
+                file_data = hash_match["DATA"]
+                file_data["LOCAL_FILENAME"] = os.path.join(self.CACHE_DIR, hash_match["LOCAL_FILENAME"])
+                file_data["METADATA_SOURCE"] = hash_match["METADATA_SOURCE"]
+                if related_dirs != {}:
+                    json_source = file_data["METADATA_SOURCE"]
+                    for json_dir, json_file in related_dirs.items():
+                        if json_file == json_source:
+                            file_data["ADDL_METADATA_DIRECTORY"] = os.path.join(self.CACHE_DIR, json_dir)
+                            break
+                self.MESSAGES[msg_data['UID']][msg_data['MESSAGE_ID']]['SharedContentDetails']["SHARED_CONTENT_FILE_LOCATION"] = file_data
+        if related_dirs != {}:
+            for json_dir, json_file in related_dirs.items():
+                if json_file in self.URL_METADATA:
+                    self.URL_METADATA[json_file]["ADDL_METADATA_DIRECTORY"] = os.path.join(self.CACHE_DIR, json_dir)
+                    contents = os.listdir(os.path.join(self.CACHE_DIR, json_dir))
+                    self.URL_METADATA[json_file]["ADDL_METADATA_DIRECTORY_CONTENTS"] = contents
 
+
+    def get_content_matches(self):
+        if not self.MESSAGES:
+            return None
+        RESULTS = {}
+        for uid, uid_data in self.MESSAGES.items():
+            if isinstance(uid_data, dict):
+                for message_id, message_data in uid_data.items():
+                    if isinstance(message_data, dict):
+                        try:        
+                            META = {}
+                            text_match = quote_text_match = quote_url_match = url_match = None
+                            if "TEXT" in message_data["MESSAGE"] and message_data["MESSAGE"]["TEXT"] != "":
+                                text = message_data["MESSAGE"]["TEXT"]
+                                text_match = self.match_url(text)
+                            if "QUOTE_TEXT" in message_data["MESSAGE"]:
+                                text = message_data["MESSAGE"]["QUOTE_TEXT"]
+                                quote_text_match = self.match_url(text)
+                            if "QUOTE_URL" in message_data["MESSAGE"]:
+                                text = message_data["MESSAGE"]["QUOTE_URL"]
+                                quote_url_match = self.match_url(text)
+                            if "URL" in message_data["MESSAGE"]:
+                                text = message_data["MESSAGE"]["URL"]
+                                url_match = self.match_url(text)
+                            for match_dict in (text_match, quote_text_match, quote_url_match, url_match):
+                                if match_dict:
+                                    META = META | match_dict
+
+                            if META != {}:
+                                if uid not in RESULTS:
+                                    RESULTS[uid] = {}
+                                RESULTS[uid][message_id] = META
+                        except (KeyError, TypeError):
+                            pass
+        return RESULTS
+    
+    def match_url(self, text):
+        MATCHES = {}
+        if "hxxp" in text:
+            url = get_url_from_text(text)
+            if url:
+                url_hash = get_md5(url)
+                these_matches = []
+                for filename, metadata in self.CACHE_FILES.items():
+                    if check_partial_match(url_hash, filename):
+                        these_matches.append([filename, metadata["path"], url_hash, metadata["type"]])
+                if these_matches:
+                    for match in these_matches:
+                        MATCHES[match[0]] = {}
+                        MATCHES[match[0]]["FILE_NAME"] = match[0]
+                        MATCHES[match[0]]["FILE_PATH"] = match[1]
+                        MATCHES[match[0]]["URL_HASH"] = match[2]
+                        MATCHES[match[0]]["TYPE"] = match[3]
+                        MATCHES[match[0]]["SANITIZED_URL"] = sanitize(url)
+        return MATCHES
+
+
+def get_json_contents(file_path):
+    if not os.path.exists(file_path):
+        return None
+    JSON_DATA = {}
+    URL_DATA = {}
+    file_name, file_size, file_md5, file_mime = (None,) * 4
+    dir_contents = os.listdir(file_path)
+    dirs = {}
+    matched_dirs = {}
+    files = []
+    for file in dir_contents:
+        full_path = os.path.join(file_path, file)
+        if os.path.isdir(full_path):
+            dirs[file] = {}
+        if os.path.isfile(full_path):
+            files.append(file)
+        if os.path.isfile(full_path) and os.path.splitext(file)[1] == '.json' and os.path.getsize(full_path) != 0:
+            with open(full_path, 'r', encoding='utf-8-sig') as json_file:
+                try:
+                    json_data = json.load(json_file)
+                except:
+                    continue
+                if "result" in json_data and "info" in json_data["result"]:
+                    file_name = json_data["result"]["info"].get("file_name", None)
+                    file_size = json_data["result"]["info"].get("file_size", None)
+                    file_md5 = json_data["result"]["info"].get("md5", None)
+                    file_mime = json_data["result"]["info"].get("mime", None)
+                    JSON_DATA[file] = {}
+                    if file_name:
+                        JSON_DATA[file]["ORIGINAL_FILE_NAME"] = file_name
+                    if file_size:
+                        JSON_DATA[file]["FILE_SIZE"] = file_size
+                    if file_md5:
+                        JSON_DATA[file]["MD5"] = file_md5
+                    if file_mime:
+                        JSON_DATA[file]["MIME"] = file_mime
+                    file_name, file_size, file_md5, file_mime = (None,) * 4
+                if "doc" in json_data and "url" in json_data["doc"]:
+                    if "fetch_ts" in json_data["doc"]:
+                        ts = convert_unix_ts(int(json_data["doc"]["fetch_ts"]))
+                        json_data["doc"]["converted_fetch_ts"] = ts
+                    URL_DATA[file] = json_data
+    for k, v in dirs.items():
+        for file in files:
+            partial_match = check_partial_match(k, file)
+            if partial_match:
+                dirs[k] = file
+    for k, v in dirs.items():
+        if v != {}:
+            matched_dirs[k] = v
+    return JSON_DATA, URL_DATA, matched_dirs
+
+
+def get_hashes(file_path):
+    if not os.path.exists(file_path):
+        return None
+    HASH_LIST = {}
+    for file in os.listdir(file_path):
+        full_path = os.path.join(file_path, file)
+        if os.path.isfile(full_path) and os.path.splitext(file)[1] != '.json':
+            file_hash = hashlib.md5()
+            with open(full_path, 'rb') as file_to_hash:
+                while True:
+                    content = file_to_hash.read(65536)
+                    if not content:
+                        break
+                    file_hash.update(content)
+            HASH_LIST[file] = file_hash.hexdigest()
+    return HASH_LIST
+
+
+def get_filenames(file_path):
+    filenames = {}
+    if not os.path.exists(file_path):
+        return None
+    for item in os.listdir(file_path):
+        item_path = os.path.join(file_path, item)
+        if Path(item_path).is_file():
+            fileType = "file"
+        elif Path(item_path).is_dir():
+            fileType = "dir"
+        else:
+            fileType = "unknown"
+        filenames[item] = {}
+        filenames[item]["path"] = item_path
+        filenames[item]["type"] = fileType
+    return filenames
+
+def get_url_from_text(text):
+    text = text.replace("hxxp", "http")
+    url_pattern = r'https?://[^\s]+'
+    match = re.search(url_pattern, text)
+    if match:
+        return match.group(0)
+    return ""
+
+def get_md5(string):
+    return hashlib.md5(string.encode('utf-8')).hexdigest()
+
+def check_partial_match(value, filename, threshold: float = 0.5):
+    """Check if provided value matches at least threshold % of filename."""
+    # Used for comparing hashes or folders against shortened or lengthened file names in the content.cache dir
+    match_length = 0
+    max_compare = min(len(value), len(filename))
+    for i in range(max_compare):
+        if value[i] == filename[i]:
+            match_length += 1
+        else:
+            break
+    min_required_match = int(len(filename) * threshold)
+    return match_length >= min_required_match
 
 def parse_file_id(uri):
     ftype = timestamp = meta = None
@@ -1320,7 +1573,7 @@ def read_time(parser, chunk, blk, offset, update_ts=False):
     return ts, offset
 
 
-def read_message_id(parser, chunk, blk, offset):
+def read_message_id(_, chunk, blk, offset):
     length = chunk[1]
     offset += 8
     msg_id = struct.unpack_from("<Q", blk[offset : offset + length])[0]
@@ -1378,7 +1631,7 @@ def read_lookup_value(parser, chunk, blk, offset):
     return value, offset
 
 
-def read_size(parser, chunk, blk, offset):
+def read_size(_, __, ___, offset):
     ## Size of the block to follow
     offset += 8
     return None, offset
@@ -1399,10 +1652,10 @@ def read_unknown(parser, chunk, blk, offset):
 
 
 def read_heads(parser, chunk, blk, offset):
-    index, blk_size = chunk
+    _, blk_size = chunk
     offset += 8
-    heads_block = memoryview(blk)[offset: offset + blk_size]
-    spacer, head_size = struct.unpack_from("<II", blk, offset)
+    # heads_block = memoryview(blk)[offset: offset + blk_size]
+    _, head_size = struct.unpack_from("<II", blk, offset)
     offset += 8
     blk_size -= 8
     count = 1
@@ -1424,7 +1677,7 @@ def read_heads(parser, chunk, blk, offset):
                 parser.DIALOG_STATES[parser.CHAT_UID][f"{key}_{count}"] = value
         count += 1
         if blk_size != 0:
-            spacer, head_size = struct.unpack_from("<II", blk, offset)
+            _, head_size = struct.unpack_from("<II", blk, offset) # _ is a spacer
             blk_size -= 8
             offset += 8
     return None, offset
@@ -1493,7 +1746,7 @@ def read_format_flags(parser, chunk, blk, offset):
     offset += length
     return flags_set, offset
 
-def read_resolution(parser, chunk, blk, offset):
+def read_resolution(_, chunk, blk, offset):
     results = []
     resolution = {}
     length = chunk[1]
@@ -1510,7 +1763,7 @@ def read_resolution(parser, chunk, blk, offset):
     resolution['h'] = results[3]
     return resolution, offset
 
-def read_event_times(parser, chunk, blk, offset):
+def read_event_times(_, chunk, blk, offset):
     ## These values are Big Endian
     results = {}
     length = chunk[1]
@@ -1560,7 +1813,7 @@ handlers = {
     28: (read_text, "VOIP_SENDER_FRIENDLY_NAME", "VOIP"),
     29: (read_text, "VOIP_SENDER_AIMID", "VOIP"),
     30: (read_value, "VOIP_DURATION", "VOIP"),
-    31: (read_lookup_value, "VOIP_IS_INCOMING", "VOIP"),
+    31: (read_lookup_value, "VOIP_DIRECTION", "VOIP"),
     32: (read_text, "CHAT_EVENT_GENERIC TEXT", "MESSAGE"),
     33: (read_text, "CHAT_EVENT_NEW_CHAT_DESCRIPTION", "MESSAGE"),
     34: (read_text, "QUOTE_TEXT", "MESSAGE"),
@@ -2686,6 +2939,31 @@ def convert_long_unix_ts(ts):
     return result
 
 
+def convert_to_mask(text):
+    """ Converts text to a * masked string, for log file comparison """
+    result = []
+    i = 0
+    while i < len(text):
+        char = text[i]
+        # This covers literal \n characters in the text
+        if i < len(text) - 1 and char == '\\' and text[i + 1] == 'n':
+            result.append('**')
+            i += 2
+        # This covers the single newline character in the text
+        elif char == "\n":
+            result.append('**')
+            i += 1
+        elif char == ' ':
+            result.append(' ')
+            i += 1
+        # This covers emoji in the text.
+        else:
+            byte_length = len(char.encode('utf-8'))
+            result.append('*' * byte_length)
+            i += 1
+    return ''.join(result)
+
+
 def get_indices(row):
     indices = {}
     for each in row:
@@ -2753,38 +3031,145 @@ def start_web(IP, load_dir, links=False, printing=False, device=None, logger=Non
     icqweb.app.run(host=IP, debug=False, use_reloader=False)
 
 
-def generate_pdf(pages, logger=None):
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        for entry in pages:
-            url, pdf_path = entry
-            if logger:
-                logger.info(f"Generating {pdf_path}")
-            page.goto(url, wait_until="networkidle")
-            try:
-                page.pdf(
-                    path=pdf_path,
-                    format="A4",
-                    print_background=True,
-                    landscape=True,
-                    prefer_css_page_size=True,
-                )
-            except PermissionError:
+async def generate_pdf(pages, logger=None, timeout=7200):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"], timeout=0)
+        try:
+            for entry in pages:
+                url, pdf_path = entry
+                page = None
                 if logger:
-                    logger.error(
-                        f"Unable to write to {pdf_path} - either the file is open, or sufficient permissions are not provided."
+                    logger.info(f"Generating {pdf_path}")
+                try:
+                    page = await browser.new_page()
+                    await page.goto(url, wait_until="domcontentloaded", timeout=0)
+                    await page.emulate_media(media="print")
+                    await page.pdf(
+                        path=pdf_path,
+                        format="A4",
+                        print_background=True,
+                        landscape=True,
+                        prefer_css_page_size=True,
                     )
-                else:
-                    print(
-                        f"Unable to write to {pdf_path} - either the file is open, or sufficient permissions are not provided."
-                    )
+                except PermissionError:
+                    if logger:
+                        logger.error(
+                            f"Unable to write to {pdf_path} - either the file is open, or sufficient permissions are not provided."
+                        )
+                    else:
+                        print(
+                            f"Unable to write to {pdf_path} - either the file is open, or sufficient permissions are not provided."
+                        )
+                except Exception as e:
+                    if logger:
+                        logger.warning(f"Generating PDF from HTML failed for {pdf_path} - {e}")
+                        logger.warning("Attempting to generate PDF from screenshots.")
+                    try:
+                        await asyncio.wait_for(generate_pdf_from_png([url, pdf_path], browser, logger), timeout=timeout)
+                    except asyncio.TimeoutError:
+                        if logger:
+                            logger.error("PDF generation from screenshots timed out after 2 hours - page is possibly too large. You can try to re-run your command with the -t argument and a timeout amount.")
+                    except Exception as x:
+                        if logger:
+                            logger.error(
+                                f"Unable to generate {pdf_path} - possibly too large? - {x}"
+                            )
+                        else:
+                            print(
+                                f"Unable to generate {pdf_path} - possibly too large? - {x}"
+                            )
+                finally:
+                    if (pages.index(entry) + 1) % 10 == 0:
+                        gc.collect()
+                    if page:
+                        await page.close()
+                        page = None
+        finally:
+            await browser.close()
         if logger:
-            logger.info("PDF Generation complete, closing browser.")
-        browser.close()
+            logger.info("PDF generation complete.")
 
 
-def print_to_pdf(base_url, output, logger=None):
+async def generate_pdf_from_png(page, browser, logger=None, chunk_size=50):
+    url, pdf_path = page
+    pdf_base = os.path.abspath(os.path.splitext(pdf_path)[0])
+    context = await browser.new_context(
+        viewport={'width': 1280, 'height': 1810},
+        device_scale_factor=2
+    )
+    page = await context.new_page()
+    page.set_default_timeout(0)
+    temp_pdfs = []
+   
+    try:
+        await page.goto(url, wait_until="networkidle", timeout=0)
+        await page.emulate_media(media="print")
+        total_height = await page.evaluate("document.body.scrollHeight")
+        viewport_height = page.viewport_size['height']
+        current_scroll = 0
+        page_index = 0
+        chunk_count = 0
+        
+        restart_interval = 100
+        if logger:
+            logger.info(f"In order to preserve / clear memory, browser will refresh every {restart_interval} pages ...")
+            logger.info("If the pages to be converted are large, this may take some time, please be patient ...")
+        while current_scroll < total_height:
+            if page_index > 0 and page_index % restart_interval == 0:
+                if logger:
+                    logger.info(f"Reached {page_index} - refreshing ...")
+                await page.close()
+                page = await context.new_page()
+                page.set_default_timeout(0)
+                await page.goto(url, wait_until="networkidle", timeout=0)
+                await page.emulate_media(media="print")
+                await page.evaluate(f"window.scrollTo(0, {current_scroll})")
+                await asyncio.sleep(1)
+                total_height = await page.evaluate("document.body.scrollHeight")
+            images = []
+            for _ in range(chunk_size):
+                if current_scroll >= total_height:
+                    break
+                await page.evaluate(f"window.scrollTo(0, {current_scroll})")
+                await asyncio.sleep(0.3)
+                img_bytes = await page.screenshot(type='jpeg', quality=85)
+                img = Image.open(io.BytesIO(img_bytes))
+                if img.mode == "RGBA":
+                    img = img.convert("RGB")
+                images.append(img)
+                current_scroll += viewport_height
+                page_index += 1
+            
+            if images:
+                chunk_count += 1
+                chunk_path = f"{pdf_base}_{chunk_count}.pdf"
+                images[0].save(chunk_path, "PDF", save_all=True, append_images=images[1:], quality=85, optimize=False)
+                temp_pdfs.append(chunk_path)
+                if logger:
+                    logger.info(f"    Saved {chunk_path} (Total pages: {page_index})")
+                del images
+                gc.collect()
+        if logger:
+            logger.info("Merging partial PDFs...")
+        merger = PdfWriter()
+        for pdf in temp_pdfs:
+            merger.append(pdf)
+        with open(pdf_path, "wb") as f:
+            merger.write(f)
+        merger.close()
+        if logger:
+            logger.info(f"Generated {pdf_path}")
+    except Exception as e:
+        if logger:
+            logger.warning(f"PNG-PDF generation failed: {e}")
+        raise e
+    finally:
+        #for temp_file in temp_pdfs:
+            #if os.path.exists(temp_file):
+                #os.remove(temp_file)
+        await context.close()
+
+def print_to_pdf(base_url, output, logger=None, timeout=7200):
     global PDFS
     pages = []
     filename = f"{output}{os.sep}ICQ Contacts.pdf"
@@ -2806,7 +3191,7 @@ def print_to_pdf(base_url, output, logger=None):
                 filename = filename.replace(".html", "")
             pages.append((full_url, f"{output}{os.sep}{filename}.pdf"))
             PDFS.append(f"{output}{os.sep}{filename}.pdf")
-    generate_pdf(pages, logger)
+    asyncio.run(generate_pdf(pages, logger, timeout))
 
 
 def merge_pdfs(output):
@@ -2830,7 +3215,7 @@ def wait_for_server(url):
 
 def save_output(content, filename):
     with open(filename, "w", encoding="utf-8") as json_file:
-        json.dump(content, json_file)
+        json.dump(content, json_file, indent=2, ensure_ascii=False)
 
 
 def log_output(log_path, to_file=False):
@@ -2838,7 +3223,7 @@ def log_output(log_path, to_file=False):
     log = logging.getLogger("icq-parser")
     log.setLevel(logging.DEBUG)
     log_fmt = logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(message)s",
+        "%(asctime)s │ %(levelname)-8s │ %(message)s",
         datefmt=__fmt__,
     )
     log_file = f"{log_path}{os.sep}icq-parser-{now}.txt"
@@ -2952,6 +3337,12 @@ def main():
         required=True,
     )
     ios_load.add_argument(
+        "-t",
+        "--timeout",
+        help="Provide a timeout value in seconds for the PDF to PNG generation for large pages",
+        default=7200,
+    )
+    ios_load.add_argument(
         "--debug",
         help="Rapid relaunch of script for debugging without indexing",
         action="store_true",
@@ -2994,6 +3385,12 @@ def main():
         help="Path to the source JSON files to display in the web interface",
         required=True,
     )
+    desktop_load.add_argument(
+        "-t",
+        "--timeout",
+        help="Provide a timeout value in seconds for the PDF to PNG generation for large pages",
+        default=7200,
+    )        
     desktop_load.add_argument(
         "--debug",
         help="Rapid relaunch of script for debugging without indexing",
@@ -3185,7 +3582,6 @@ def main():
             arg_parse.error(
                 f"[!] The path {args.source} does not exist. Please check your path and try again."
             )
-
         if dparser.INFO_CACHE_FILES:
             logger.info("Processing users profile information cache ... ")
             dparser.get_info_cache()
@@ -3245,9 +3641,15 @@ def main():
                 )
             dparser.get_db_content()
         if dparser.DIALOG_UI_FILES:
+            logger.info("Processing dialog configuration files ... ")
             dparser.get_ui_settings()
         if dparser.LOG_FILES:
+            logger.info("Processing log files ... ")
             dparser.get_log_content()
+        if dparser.FAVORITE_FILES:
+            logger.info("Processing favorites files ... ")
+            dparser.get_favorites()
+        logger.info("Correlating data ... ")
         dparser.correlate_data()
         outputs = {
             "owner": dparser.INFO_CACHE,
@@ -3262,6 +3664,8 @@ def main():
             "contacts": dparser.CONTACT_LIST,
             "app-settings": dparser.DIALOG_UI_SETTINGS,
             "log-contents": dparser.LOG_CONTENTS,
+            "favorites": dparser.FAVORITES,
+            "shared-urls": dparser.URL_METADATA,
         }
         for file, data in outputs.items():
             if data:
@@ -3304,6 +3708,8 @@ def main():
         load_path = f"{os.path.normpath(os.path.abspath(args.source))}{os.sep}"
         if args.print and os.path.exists(args.print) and os.path.isdir(args.print):
             log_path = f"{os.path.normpath(os.path.abspath(args.print))}{os.sep}"
+        elif args.print and not (os.path.exists(args.print) or not os.path.isdir(args.print)):
+            arg_parse.error(f"[!] The output path for the PDFs - {args.print} - does not exist! Please check your path and try again.")
         else:
             log_path = load_path
         logger = log_output(log_path, args.log)
@@ -3317,7 +3723,6 @@ def main():
             url = f"http://{args.ip}:5000"
             try:
                 printing = True
-                logger.info(f"Starting the webserver at {url}")
                 flask_thread = threading.Thread(
                     target=start_web,
                     args=(args.ip, load_path, args.links, printing, args.device, logger),
@@ -3328,7 +3733,7 @@ def main():
                 arg_parse.error(f"[!] Unable to start the web server: {e}")
             wait_for_server(url)
             logger.info("Gathering list of PDFs to generate ...")
-            print_to_pdf(url, output_path, logger)
+            print_to_pdf(url, output_path, logger, timeout=args.timeout)
             if args.merge:
                 merge_pdfs(f"{output_path}{os.sep}ICQ-Content-Combined.pdf")
         else:
@@ -3380,10 +3785,12 @@ def main():
             arg_parse.error(f"[!] Unable to start the web server: {e}")
         wait_for_server(url)
         try:
+            project_name = "ICQ_PARSER_WEBSITE_OUTPUT"
+            logger.info(f"Preparing to save website data to {dest_path}{os.sep}{project_name}")
             save_website(
                 url,
                 project_folder=dest_path,
-                project_name="ICQ_PARSER_WEBSITE_OUTPUT",
+                project_name=project_name,
                 bypass_robots=True,
                 debug=False,
                 threaded=False,
@@ -3392,7 +3799,8 @@ def main():
             )
         except Exception as e:
             logger.error(f"Unable to save website: {e}")
-        logger.info(f"Website download finished - saved to {dest_path}.")
+            return
+        logger.info(f"Website download finished - saved to {dest_path}{os.sep}{project_name}.")
         flask_thread._tstate_lock.release_lock()
         flask_thread._stop()
         logger.info("Web server stopped.")

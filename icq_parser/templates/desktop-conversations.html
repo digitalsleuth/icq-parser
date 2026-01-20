@@ -22,10 +22,18 @@
             {% endif %}
         </div>
         <h1 class="title">
-            {% if contact_name.ConversationType == "GROUP CHAT" %}
+            {% if contact_name.ConversationType == "GROUP CHAT" or "ConversationType" not in contact_name %}
+              {% if "FriendlyName" not in contact_name %}
+                Conversation in chatroom {{ contact_name.AIMID }}
+              {% else %}
                 Conversation in chatroom {{ contact_name.AIMID }} - {{ contact_name.FriendlyName }}
+              {% endif %}
             {% elif contact_name.ConversationType == "PRIVATE" %}
+              {% if "FriendlyName" not in contact_name %}
+                Conversation with {{ contact_name.AIMID }}
+              {% else %}
                 Conversation with {{ contact_name.AIMID }} - {{ contact_name.FriendlyName }}
+              {% endif %}
             {% endif %}
             {% if avatar %}
                 <img src="{{ url_for('serve', file=avatar) }}"
@@ -47,18 +55,22 @@
                         {% for k, v in messages.items() %}
                             {% if v.MESSAGE.DIRECTION == "INCOMING" %}
                                 {% if "VOIP" in v %}
-                                    {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_IS_INCOMING", "Unknown") + " from " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
+                                    {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_DIRECTION", "Unknown") + " from " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
                                     {% set class = "msg rcvd voip" %}
                                 {% else %}
-                                    {% set msg = v.MESSAGE.TEXT %}
-                                    {% set class = "msg rcvd" %}
+                                  {% set msg = v.MESSAGE.TEXT %}
+                                  {% set class = "msg rcvd" %}
                                 {% endif %}
                                 {% if msg == "" and "QUOTE_TEXT" in v.MESSAGE and v.MESSAGE.QUOTE_TEXT != "" %}
                                     {% set msg = v.MESSAGE.QUOTE_TEXT %}
                                 {% endif %}
                                 <tr class="msg rcvd">
                                     <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
+                                    {% if contact_name.ConversationType == "GROUP CHAT" %}
+                                    <td class="nowrap normal">{{ v.MESSAGE.get("CHAT_SENDER", "") }}</td>
+                                    {% else %}
                                     <td class="nowrap normal">{{ v.UID }}</td>
+                                    {% endif %}
                                     {% if "SharedContentDetails" in v %}
                                         {% set class = "msg rcvd attachment" %}
                                     {% elif "QUOTE_TEXT" in v.MESSAGE and "QUOTE_IS_FORWARDED" in v.MESSAGE and v.MESSAGE.QUOTE_IS_FORWARDED is true %}
@@ -79,18 +91,34 @@
                                                 <table class="attachment">
                                                 <tr><td></td></tr>
                                                 {{ msg|replace('\n', '<br>')|safe }}<p><br>
+                                                {% for key, val in v.MESSAGE.items() %}
+                                                    {% if key.startswith('QUOTE') %}
+                                                    <tr>
+                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                </table><br/><br/>
+                                                <table class="attachment">
+                                                <tr><td></td></tr>
                                                 {% for key, val in v["SharedContentDetails"].items() %}
                                                     {% if val is not none and val != "" %}
                                                         <tr>
                                                         <td class="nowrap normal white">{{ key }}:</td>
-                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" %}
-                                                            <td class="nowrap normal white">
+                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" or key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" %}
+                                                            <td class="normal white small">
                                                             {% for k, v in val.items() %}
+                                                            {% if key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" and v is mapping %}
+                                                            {% for k2, v2 in v.items() %}
+                                                                {{ k2 }}: {{ v2 }}<br>
+                                                            {% endfor %}
+                                                            {% else %}
                                                                 {{ k }}: {{ v }}<br>
+                                                            {% endif %}
                                                             {% endfor %}
                                                             </td>
                                                         {% else %}
-                                                            <td class="white">{{ val }}</td>
+                                                            <td class="normal white small">{{ val }}</td>
                                                         {% endif %}
                                                         </tr>
                                                     {% endif %}
@@ -104,7 +132,7 @@
                                                 {% for key, val in v.MESSAGE.items() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
@@ -117,7 +145,7 @@
                                     </tr>
                                 {% elif v.MESSAGE.DIRECTION == "OUTGOING" %}
                                     {% if "VOIP" in v %}
-                                        {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_IS_INCOMING", "Unknown") + " to " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
+                                        {% set msg = "[VOIP CALL DIRECTION " + v.VOIP.get("VOIP_DIRECTION", "Unknown") + " to " + v.VOIP.VOIP_SENDER_AIMID + " - DURATION: " + (v.VOIP.get("VOIP_DURATION", 0)|string) + " seconds - STATUS " + v.VOIP.get("VOIP_EVENT_TYPE", "Unknown") + " ]" %}
                                         {% set class = "msg sent voip" %}
                                     {% else %}
                                         {% set msg = v.MESSAGE.TEXT %}
@@ -149,18 +177,34 @@
                                                 <table class="attachment">
                                                 <tr><td></td></tr>
                                                 {{ msg|replace('\n', '<br>')|safe }}<p><br>
+                                                {% for key, val in v.MESSAGE.items() %}
+                                                    {% if key.startswith('QUOTE') %}
+                                                    <tr>
+                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                    </tr>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                </table><br/><br/>
+                                                <table class="attachment">
+                                                <tr><td></td></tr>
                                                 {% for key, val in v["SharedContentDetails"].items() %}
                                                     {% if val is not none and val != "" %}
                                                         <tr>
                                                         <td class="nowrap normal white">{{ key }}:</td>
-                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" %}
-                                                            <td class="nowrap normal white">
+                                                        {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" or key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION"  %}
+                                                            <td class="normal white small">
                                                             {% for k, v in val.items() %}
+                                                              {% if key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" and v is mapping %}
+                                                                {% for k2, v2 in v.items() %}
+                                                                  {{ k2 }}: {{ v2 }}<br>
+                                                                {% endfor %}
+                                                              {% else %}
                                                                 {{ k }}: {{ v }}<br>
+                                                              {% endif %}
                                                             {% endfor %}
                                                             </td>
                                                         {% else %}
-                                                            <td class="white">{{ val }}</td>
+                                                            <td class="normal white small">{{ val }}</td>
                                                         {% endif %}
                                                         </tr>
                                                     {% endif %}
@@ -174,7 +218,7 @@
                                                 {% for key, val in v.MESSAGE.items() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}

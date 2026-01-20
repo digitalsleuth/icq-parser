@@ -68,10 +68,16 @@
                             {% if val is mapping %}
                                 {{ key }}:<br />
                                 {% for k2, v2 in val.items() %}
-                                    {% if k2 == "URI_DECODED_METADATA" or k2 == "SHARED_MESSAGE_FLAGS" %}
+                                    {% if k2 == "URI_DECODED_METADATA" or k2 == "SHARED_MESSAGE_FLAGS" or k2 == "SHARED_CONTENT_FILE_METADATA" or k2 == "SHARED_CONTENT_FILE_LOCATION" %}
                                         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2 }}:<br />
                                         {% for k3, v3 in v2.items() %}
+                                        {% if (k2 == "SHARED_CONTENT_FILE_LOCATION" or k2 == "SHARED_CONTENT_FILE_METADATA") and v3 is mapping %}
+                                        {% for k4, v4 in v3.items() %}
+                                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k4 }}: {{ v4 }}<br />
+                                        {% endfor %}
+                                        {% else %}
                                             &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k3 }}: {{ v3 }}<br />
+                                        {% endif %}
                                         {% endfor %}
                                     {% else %}
                                         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2 }}: {{ v2 }}<br />

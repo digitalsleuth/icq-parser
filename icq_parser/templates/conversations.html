@@ -23,9 +23,17 @@
         </div>
         <h1 class="title">
             {% if contact_name.ContactType == "GROUP CHAT" %}
+              {% if "DisplayName" not in contact_name %}
+                Conversation in chatroom {{ contact_name.UID }}
+              {% else %}
                 Conversation in chatroom {{ contact_name.UID }} - {{ contact_name.DisplayName }}
+              {% endif %}
             {% elif contact_name.ContactType == "PRIVATE" %}
+              {% if "DisplayName" not in contact_name %}
+                Conversation with {{ contact_name.UID }}
+              {% else %}
                 Conversation with {{ contact_name.UID }} - {{ contact_name.DisplayName }}
+              {% endif %}
             {% endif %}
             {% if avatar %}
                 <img src="{{ url_for('serve', file=avatar) }}"
@@ -58,7 +66,11 @@
                                 {% endif %}
                                 <tr class="msg rcvd">
                                     <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
+                                    {% if "PARTICIPANT" in v.MESSAGE %}
+                                    <td class="nowrap normal">{{ v.MESSAGE.PARTICIPANT }}</td>
+                                    {% else %}
                                     <td class="nowrap normal">{{ v.MESSAGE.CONTACT_PARTICIPANT }}</td>
+                                    {% endif %}
                                     {% if "FILE" in v %}
                                         {% set class = "msg rcvd attachment" %}
                                     {% endif %}
