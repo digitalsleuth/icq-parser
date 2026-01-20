@@ -609,7 +609,7 @@ class DesktopParser:
                 file_type = magic.from_file(file)
             except ValueError:
                 return None
-            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8") or file_type.startswith("JSON"):
                 with open(file, encoding="utf-8") as f:
                     json_data = json.load(f)
                     self.INFO_CACHE["NICKNAME"] = json_data["info"]["nick"]
@@ -648,7 +648,7 @@ class DesktopParser:
                         else:
                             offset += 8
                     content = content[blk_size + 8 :]
-                self.OWNER_UID = self.INFO_CACHE["AIMID"] if not None else None
+            self.OWNER_UID = self.INFO_CACHE["AIMID"] if not None else None
         return self.INFO_CACHE
 
     def get_contact_list(self):
@@ -850,7 +850,7 @@ class DesktopParser:
                 file_type = magic.from_file(file)
             except ValueError:
                 return None
-            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8") or file_type.startswith("JSON"):
                 with open(file, encoding="utf-8") as f:
                     json_data = json.load(f)
                 for aimid in json_data["dialogs"]:
@@ -1198,7 +1198,7 @@ class DesktopParser:
                 file_type = magic.from_file(file)
             except ValueError:
                 return None
-            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8") or file_type.startswith("JSON"):
                 with open(file, encoding="utf-8") as f:
                     json_data = json.load(f)
                 for aimid in json_data["favorites"]:
