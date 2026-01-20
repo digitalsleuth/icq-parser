@@ -7,10 +7,16 @@ It also parses the contents into JSON files which can be ingested into other too
 
 ### Install
 ```bash
-icq-parser install
+python3 -m pip install icq-parser
 ```
 
-This will install the chromium headless version for the desired system. It is only required once, at initial run, and thus  
+Then:
+
+```bash
+playwright install chromium
+```
+
+This will install the chromium headless version for the desired system. It is only required once, before initial run, and thus  
 internet connectivity is required for this one time only.
 
 
