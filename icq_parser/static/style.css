@@ -1,76 +1,148 @@
 body { margin: 0; }
+.header, .navbar a, .title, .attachment, p, table, table.attachment, th, li, li a {
+  font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif;
+}
 .avatar { width: 52px; height: 52px; border-radius: 50%; vertical-align: bottom; }
-.header { font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; word-break: break-word; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: text-top; border-bottom: 0.1rem solid black; }
-.navbar { overflow: hidden; background-color: #4682B4; position: fixed; top: 0; width: 100%; color: white; height: 38px; }
-.navbar a { float:left; display: block; color: white; text-align: center; padding: 10px 10px; text-decoration: none; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+.header, th { 
+  word-break: break-word; 
+  text-align: left; 
+  padding: 0.2rem 0.3rem 0.2rem 0.2rem; 
+  vertical-align: text-top; 
+}
+.header { border-bottom: 0.1rem solid black; }
+th { word-break: break-all; border: 1px solid gray; border-bottom-width: 0.15rem; border-bottom-color: black; }
+.navbar { 
+  overflow: hidden; 
+  background-color: #4682B4; 
+  position: fixed; 
+  top: 0; 
+  width: 100%; 
+  color: white; 
+  height: 38px; 
+}
+.navbar a { 
+  float: left; 
+  display: block; 
+  color: white; 
+  text-align: center; 
+  padding: 10px; 
+  text-decoration: none; 
+}
 .navbar a:hover { background: white; color: #4682B4; }
 .main { margin-top: 90px; margin-left: 5px; }
 .preview { height: 20%; width: 20%; border-radius: 20px; }
-.title { color: #778899; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; position: fixed; margin-top: -52px; background: white; width: 99.5%; margin-left: 3px; margin-right: 2px; padding-top: 2px; padding-bottom: 2px; border-bottom: 0.2rem solid #4682B4; -webkit-box-shadow: 0px 1px 0px #ccc; -moz-box-shadow: 0px 1px 0px #ccc; box-shadow: 0px 1px 0px #ccc; }
-.play { vertical-align: bottom; width: 48px; height: 48px; border-radius: 10px; margin-right: 5px; }
+.title { 
+  color: #778899; 
+  position: fixed; 
+  margin: -52px 2px 0 3px; 
+  background: white; 
+  width: 99.5%; 
+  padding: 2px 0; 
+  border-bottom: 0.2rem solid #4682B4; 
+  box-shadow: 0 1px 0 #ccc; 
+}
+.play { 
+  vertical-align: bottom; 
+  width: 48px; 
+  height: 48px; 
+  border-radius: 10px; 
+  margin-right: 5px; 
+}
 .link { color: #4682B4; }
 .t1 tr:nth-child(even) { background-color: #f1f1f1; }
 .t3 { padding: 0; height: 100%; }
-.attachment { border-spacing: 0 6px; border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-top: -31px; width: 99.5%; margin-left: 1px; border-collapse: collapse; }
-p { color: #778899; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; font-weight: bold; margin-left: 10px; }
-h2 { font-family: Arial, sans-serif; color: #778899; text-align: center; }
-table { width: 99%; height: 99%; border: 1px; border-collapse: collapse; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; margin-left: 5px; }
-table.attachment { border: 0; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; table-layout: auto; margin-left: 1px; border-collapse: collapse; }
-th { font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; word-break: break-all; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: text-top; border-bottom: 0.15rem solid black; border: 1px solid gray; }
-td { white-space: nowrap; word-break: break-all; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: text-top; color: #2f4f4f; border: 1px solid gray; }
+.attachment { 
+  border-spacing: 0 6px; 
+  border: 0; 
+  table-layout: auto; 
+  margin: -31px 0 0 1px; 
+  width: 99.5%; 
+  border-collapse: collapse; 
+}
+p { 
+  color: #778899; 
+  font-weight: bold; 
+  margin-left: 10px; 
+}
+h2 { 
+  font-family: Arial, sans-serif; 
+  color: #778899; 
+  text-align: center; 
+}
+table { 
+  width: 99%; 
+  height: 99%; 
+  border: 1px; 
+  border-collapse: collapse; 
+  margin-left: 5px; 
+}
+table.attachment { 
+  border: 0; 
+  table-layout: auto; 
+  margin-left: 1px; 
+  border-collapse: collapse; 
+}
+td { 
+  white-space: nowrap; 
+  word-break: break-all; 
+  text-align: left; 
+  padding: 0.2rem 0.3rem 0.2rem 0.2rem; 
+  vertical-align: text-top; 
+  color: #2f4f4f; 
+  border: 1px solid gray; 
+}
 td.narrow { width: 10%; }
-td.nowrap { white-space: nowrap; text-align: left; padding: 0.2rem; padding-right: 0.3rem; vertical-align: text-top; }
-td.nowrap.normal { white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; }
-td.nowrap.normal.white { color: white; white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; }
-td.nowrap.white { color: white; white-space: nowrap; text-align: left; padding: 0.17rem; padding-right: 0.3rem; vertical-align: middle; }
 td.short { width: 90%; }
 td.white { color: white; }
 td.wrap { white-space: normal; }
-td a:link { color: #4682B4; }
+td.nowrap { 
+  white-space: nowrap; 
+  padding: 0.2rem 0.3rem 0.2rem 0.2rem; 
+  vertical-align: text-top; 
+}
+td.nowrap.normal { 
+  padding: 0.17rem 0.3rem 0.17rem 0.17rem; 
+  vertical-align: middle; 
+}
+td.nowrap.normal.white, td.nowrap.white { 
+  color: white; 
+  white-space: nowrap; 
+  padding: 0.17rem 0.3rem 0.17rem 0.17rem; 
+  vertical-align: middle; 
+}
+td a:link, td a:active, td a:visited { color: #4682B4; }
 td a:hover { color: green; }
-td a:active { color: #4682B4; }
-td a:visited { color: #4682B4; }
 tr:nth-child(even) { background-color: #f1f1f1; }
-tr:hover { color: white; background: #4682B4; }
-td:hover { color: white; background: #4682B4; }
-tr:hover a:link { color: white; background: #4682B4; }
-tr:hover a:active { color: white; background: #4682B4; }
-tr:hover a:visited { color: white; background: #4682B4; }
-li { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; list-style-type: none; }
-li a:link { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
+tr:hover, td:hover { color: white; background: #4682B4; }
+tr:hover a:link, tr:hover a:active, tr:hover a:visited { color: white; background: #4682B4; }
+li { color: #3974ed; list-style-type: none; }
+li a:link, li a:active { color: #3974ed; }
 li a:hover { color: green; }
-li a:active { color: #3974ed; font-family: Roboto, "Noto Sans", "Liberation Sans", OpenSans, sans-serif; }
-input[type=text] { width: 10%; margin-top: 9px; border: 1px solid #ccc; border-radius: 4px; margin-left: +2px; }
-input[type=text]:focus, select:focus { border: 1px solid #555; outline: none; }
+input[type=text] { 
+  width: 10%; 
+  margin: 9px 0 0 2px; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+}
+input[type=text]:focus, select:focus { border-color: #555; outline: none; }
 @media print {
-  .navbar {
-    display: none;
-    font-family: Arial, sans-serif !important;
+  .navbar { display: none; }
+  .title { 
+    position: static; 
+    display: block; 
+    float: none; 
+    margin-top: 0; 
+    padding-bottom: 0; 
+    page-break-after: avoid; 
   }
-  .title {
-    position: static;
-    display: block;
-    float: none;
-    margin-top: 0px;
-    padding-bottom: 0px;
-    page-break-after: avoid;
-    font-family: Arial, sans-serif !important;
+  .main { margin-top: 0; }
+  table { margin-top: -10px; }
+  a { pointer-events: none; text-decoration: none; color: inherit; }
+  td.msg .bubble, td.msg.sent .bubble, td.msg.rcvd .bubble, 
+  td.msg.sent.attachment .bubble, td.msg.rcvd.attachment .bubble { 
+    display: block; 
+    max-width: 100%; 
+    page-break-inside: avoid; 
   }
-  .main {
-    margin-top: 0;
-  }
-  table {
-    font-family: Arial, sans-serif !important;
-    margin-top: -10px;
-  }
-  a {
-    pointer-events: none;
-    text-decoration: none;
-    color: inherit;
-  }
-  td.msg .bubble, td.msg.sent .bubble, td.msg.rcvd .bubble, td.msg.sent.attachment .bubble, td.msg.rcvd.attachment .bubble {
-    display: block;
-    max-width: 100%;
-    page-break-inside: avoid;
-  }
+  .navbar, .title, table { font-family: Arial, sans-serif !important; }
 }

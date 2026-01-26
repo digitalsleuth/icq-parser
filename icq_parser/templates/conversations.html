@@ -50,7 +50,7 @@
                     <th class="header" title="Contact">Contact</th>
                     <th class="header" title="Message">Message</th>
                 </tr>
-                <br/>
+                <br />
                     {% if messages is not none %}
                         {% for k, v in messages.items() %}
                             {% if v.MESSAGE.DIRECTION == "INCOMING" %}
@@ -66,10 +66,10 @@
                                 {% endif %}
                                 <tr class="msg rcvd">
                                     <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
-                                    {% if "PARTICIPANT" in v.MESSAGE %}
+                                    {% if "PARTICIPANT" in v.MESSAGE and v.MESSAGE.PARTICIPANT is not none %}
                                     <td class="nowrap normal">{{ v.MESSAGE.PARTICIPANT }}</td>
                                     {% else %}
-                                    <td class="nowrap normal">{{ v.MESSAGE.CONTACT_PARTICIPANT }}</td>
+                                    <td class="nowrap normal">{{ v.UID }}</td>
                                     {% endif %}
                                     {% if "FILE" in v %}
                                         {% set class = "msg rcvd attachment" %}
@@ -132,19 +132,19 @@
                                                         <br />
                                                     {% endif %}
                                                     <br />
-                                                    <table class="attachment">
+                                                    <table class="attachment meta rcvd">
                                                     <tr><td></td></tr>
                                                         {% for key, val in v["FILE"][file_key].items() %}
                                                             {% if val is not none and val != "" and key != "FILE_CAPTION" %}
                                                                 <tr class="t3">
-                                                                    <td class="nowrap normal white">{{ key }}:</td>
-                                                                    <td class="white">{{ val }}</td>
+                                                                    <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
+                                                                    <td class="normal white small">{{ val }}</td>
                                                                 </tr>
                                                             {% endif %}
                                                         {% endfor %}
                                                     </table>
                                                 {% else %}
-                                                    {{ msg|replace('\n', '<br>') |safe }}
+                                                    {{ msg|replace('\n', '<br />') |safe }}
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -223,20 +223,20 @@
                                                         <p>
                                                             <br />
                                                         {% endif %}
-                                                        <br/>
-                                                        <table class="attachment">
+                                                        <br />
+                                                        <table class="attachment meta sent">
                                                         <tr><td></td></tr>
                                                             {% for key, val in v["FILE"][file_key].items() %}
                                                                 {% if val is not none and val != "" and key != "FILE_CAPTION" %}
                                                                     <tr>
-                                                                        <td class="nowrap normal white">{{ key }}:</td>
-                                                                        <td class="white">{{ val }}</td>
+                                                                        <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
+                                                                        <td class="normal white small">{{ val }}</td>
                                                                     </tr>
                                                                 {% endif %}
                                                             {% endfor %}
                                                         </table>
                                                     {% else %}
-                                                        {{ msg|replace('\n', '<br>') |safe }}
+                                                        {{ msg|replace('\n', '<br />') |safe }}
                                                     {% endif %}
                                                 </div>
                                             </td>

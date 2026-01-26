@@ -31,21 +31,21 @@
                     <th onclick="sortTable(0)" title="File ID">File ID</th>
                     <th onclick="sortTable(1)"title="File Details">File Details</th>
                 </tr>
-                {% for k, v in files.items() %}
+                {% for k, v in files.items()|sort() %}
                     <tr>
                         <td>{{ k }}</td>
                         <td class="wrap">
-                            {% for key, val in v.items() %}
+                            {% for key, val in v.items()|sort() %}
                                 {% set keys = [
                                     "FILE_STORAGE_PREVIEW_FILENAME_EXISTS",
                                     "FILE_STORAGE_CONTENT_FILENAME_EXISTS",
                                     "FILE_ORIGINAL_CONTENT_FILENAME_EXISTS"
                                 ] %}
                                 {% if key in keys and val is not none and val != "" and links %}
-                                    {{ key }}: <a href="{{ url_for('serve', file=val) }}" target="_blank">{{ val }}</a>
+                                    {{ key.replace("_"," ").title() }}: <a href="{{ url_for('serve', file=val) }}" target="_blank">{{ val }}</a>
                                     <br />
                                 {% else %}
-                                    {{ key }}: {{ val }}
+                                    {{ key.replace("_"," ").title() }}: {{ val }}
                                     <br />
                                 {% endif %}
                             {% endfor %}
@@ -57,36 +57,37 @@
                     <th onclick="sortTable(0)" title="File ID">ICQ ID</th>
                     <th onclick="sortTable(1)"title="File Details">Content Details</th>
                 </tr>
-                {% for k, v in files.items() %}
+                {% for k, v in files.items()|sort() %}
                     <tr>
                         <td>{{ k }}</td>
                         <td class="wrap">
-                            {% for key, val in v.items() %}
-                            {% if key == "MediaTypes" or key == "NumberOfSharedItems" %}
+                            {% for key, val in v.items()|sort() %}
+                              {% if key == "MediaTypes" or key == "NumberOfSharedItems" %}
                                 {% set key = ("&nbsp;&nbsp;&nbsp;&nbsp;" + key)|safe %}
-                            {% endif %}
-                            {% if val is mapping %}
+                              {% endif %}
+                              {% if val is mapping %}
                                 {{ key }}:<br />
-                                {% for k2, v2 in val.items() %}
-                                    {% if k2 == "URI_DECODED_METADATA" or k2 == "SHARED_MESSAGE_FLAGS" or k2 == "SHARED_CONTENT_FILE_METADATA" or k2 == "SHARED_CONTENT_FILE_LOCATION" %}
-                                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2 }}:<br />
-                                        {% for k3, v3 in v2.items() %}
-                                        {% if (k2 == "SHARED_CONTENT_FILE_LOCATION" or k2 == "SHARED_CONTENT_FILE_METADATA") and v3 is mapping %}
+                                {% for k2, v2 in val.items()|sort() %}
+                                  {% if k2 == "URI_DECODED_METADATA" or k2 == "SHARED_MESSAGE_FLAGS" or k2 == "SHARED_CONTENT_FILE_METADATA" or k2 == "SHARED_CONTENT_FILE_LOCATION" %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2.replace("_"," ").title() }}:<br />
+                                    {% for k3, v3 in v2.items() %}
+                                      {% if (k2 == "SHARED_CONTENT_FILE_LOCATION" or k2 == "SHARED_CONTENT_FILE_METADATA") and v3 is mapping %}
                                         {% for k4, v4 in v3.items() %}
-                                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k4 }}: {{ v4 }}<br />
+                                          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k4.replace("_"," ").title() }}: {{ v4 }}<br />
                                         {% endfor %}
-                                        {% else %}
-                                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k3 }}: {{ v3 }}<br />
-                                        {% endif %}
-                                        {% endfor %}
-                                    {% else %}
-                                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2 }}: {{ v2 }}<br />
-                                    {% endif %}
+                                        <br />
+                                      {% else %}
+                                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k3.replace("_"," ").title() }}: {{ v3 }}<br />
+                                      {% endif %}
+                                    {% endfor %}
+                                  {% else %}
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ k2.replace("_"," ").title() }}: {{ v2 }}<br />
+                                  {% endif %}
                                 {% endfor %}
                                 <br />
-                            {% else %}
+                              {% else %}
                                 {{ key }}: {{ val }}<br />
-                            {% endif %}
+                              {% endif %}
                             {% endfor %}
                         </td>
                     </tr>

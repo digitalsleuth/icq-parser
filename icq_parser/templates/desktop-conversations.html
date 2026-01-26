@@ -88,33 +88,69 @@
                                         <div class="bubble">
                                             {% if "SharedContentDetails" in v %}
                                                 <br/>
-                                                <table class="attachment">
+                                            {% if "SHARED_CONTENT_FILE_LOCATION" in v["SharedContentDetails"] and "LOCAL_FILE_NAME" in v["SharedContentDetails"]["SHARED_CONTENT_FILE_LOCATION"]  %}
+                                                {% set file = v.SharedContentDetails.SHARED_CONTENT_FILE_LOCATION.LOCAL_FILE_NAME %}
+                                                {% if links %}
+                                                    <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                                        <img src="{{ url_for('serve', file=file) }}"
+                                                             alt="{{ file }}"
+                                                             title="{{ file }}"
+                                                             class="preview">
+                                                    </a>
+                                                    <br />
+                                                    <br />
+                                                {% else %}
+                                                    <img src="{{ url_for('serve', file=file) }}"
+                                                         alt="{{ file }}"
+                                                         title="{{ file }}"
+                                                         class="preview">
+                                                    <br />
+                                                    <br />
+                                                {% endif %}
+                                            {% endif %}
+                                                {% if "QUOTE_TEXT" in v.MESSAGE %}
+                                                {% set class = "attachment quote rcvd" %}
+                                                {% else %}
+                                                {% set class = "attachment" %}
+                                                {% endif %}
+                                                {{ msg|replace('\n', '<br />')|safe }}<p><br />
+                                                <table class="{{ class }}">
                                                 <tr><td></td></tr>
-                                                {{ msg|replace('\n', '<br>')|safe }}<p><br>
-                                                {% for key, val in v.MESSAGE.items() %}
+                                                {% for key, val in v.MESSAGE.items()|sort() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key.replace("_"," ").title() }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
-                                                </table><br/><br/>
-                                                <table class="attachment">
+                                                </table><br /><br />
+                                                <table class="attachment meta rcvd">
                                                 <tr><td></td></tr>
-                                                {% for key, val in v["SharedContentDetails"].items() %}
+                                                {% for key, val in v["SharedContentDetails"].items()|sort() %}
                                                     {% if val is not none and val != "" %}
                                                         <tr>
-                                                        <td class="nowrap normal white">{{ key }}:</td>
+                                                        <td class="nowrap normal white">{{ key.replace("_"," ").title() }}:</td>
                                                         {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" or key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" %}
                                                             <td class="normal white small">
-                                                            {% for k, v in val.items() %}
-                                                            {% if key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" and v is mapping %}
-                                                            {% for k2, v2 in v.items() %}
-                                                                {{ k2 }}: {{ v2 }}<br>
-                                                            {% endfor %}
-                                                            {% else %}
-                                                                {{ k }}: {{ v }}<br>
-                                                            {% endif %}
+                                                            {% for k2, v2 in val.items()|sort() %}
+                                                              {% if key == "SHARED_CONTENT_FILE_METADATA" and v2 is mapping %}
+                                                                {% for k3, v3 in v2.items()|sort() %}
+                                                                  {% if links and k3 == "FILE_PATH" %}
+                                                                    {{ k3.replace("_"," ").title() }}: <a href="{{ url_for('serve', file=v3) }}" target="_blank">{{ v3 }}</a><br />
+                                                                  {% else %}
+                                                                    {{ k3.replace("_"," ").title() }}: {{ v3 }}<br />
+                                                                  {% endif %}
+                                                                {% endfor %}
+                                                                <br />
+                                                              {% elif key == "SHARED_CONTENT_FILE_LOCATION" %}
+                                                                  {% if links and k2 == "LOCAL_FILE_NAME" %}
+                                                                    {{ k2.replace("_"," ").title() }}: <a href="{{ url_for('serve', file=v2) }}" target="_blank">{{ v2 }}</a><br />
+                                                                  {% else %}
+                                                                    {{ k2.replace("_"," ").title() }}: {{ v2 }}<br />
+                                                                  {% endif %}
+                                                              {% else %}
+                                                                {{ k2.replace("_"," ").title() }}: {{ v2 }}<br />
+                                                              {% endif %}
                                                             {% endfor %}
                                                             </td>
                                                         {% else %}
@@ -126,19 +162,19 @@
                                                     </table>
                                             {% elif class == "msg rcvd fwd" or class == "msg rcvd myquote" or class == "msg rcvd theirquote" %}
                                                 <br/>
-                                                    <table class="attachment">
+                                                    <table class="attachment quote rcvd">
                                                     <tr><td></td></tr>
-                                                {{ msg|replace('\n', '<br>') |safe }}<p><br>
-                                                {% for key, val in v.MESSAGE.items() %}
+                                                {{ msg|replace('\n', '<br>') |safe }}<p><br />
+                                                {% for key, val in v.MESSAGE.items()|sort() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key.replace("_"," ").title() }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
                                                 </table>
                                             {% else %}
-                                                {{ msg|replace('\n', '<br>') |safe }}
+                                                {{ msg|replace('\n', '<br />') |safe }}
                                             {% endif %}
                                             </div>
                                         </td>
@@ -174,32 +210,62 @@
                                         <div class="bubble">
                                             {% if "SharedContentDetails" in v %}
                                                 <br/>
-                                                <table class="attachment">
+                                            {% if "SHARED_CONTENT_FILE_LOCATION" in v["SharedContentDetails"] and "LOCAL_FILE_NAME" in v["SharedContentDetails"]["SHARED_CONTENT_FILE_LOCATION"]  %}
+                                                {% set file = v.SharedContentDetails.SHARED_CONTENT_FILE_LOCATION.LOCAL_FILE_NAME %}
+                                                {% if links %}
+                                                    <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                                        <img src="{{ url_for('serve', file=file) }}"
+                                                             alt="{{ file }}"
+                                                             title="{{ file }}"
+                                                             class="preview">
+                                                    </a>
+                                                    <br />
+                                                    <br />
+                                                {% else %}
+                                                    <img src="{{ url_for('serve', file=file) }}"
+                                                         alt="{{ file }}"
+                                                         title="{{ file }}"
+                                                         class="preview">
+                                                    <br />
+                                                    <br />
+                                                {% endif %}
+                                            {% endif %}
+                                                {% if "QUOTE_TEXT" in v.MESSAGE %}
+                                                {% set class = "attachment quote sent" %}
+                                                {% else %}
+                                                {% set class = "attachment" %}
+                                                {% endif %}
+                                                {{ msg|replace('\n', '<br>')|safe }}<p><br />
+                                                <table class="{{ class }}">
                                                 <tr><td></td></tr>
-                                                {{ msg|replace('\n', '<br>')|safe }}<p><br>
-                                                {% for key, val in v.MESSAGE.items() %}
+                                                {% for key, val in v.MESSAGE.items()|sort() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key.replace("_"," ").title() }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
-                                                </table><br/><br/>
-                                                <table class="attachment">
+                                                </table><br /><br />
+                                                <table class="attachment meta sent">
                                                 <tr><td></td></tr>
-                                                {% for key, val in v["SharedContentDetails"].items() %}
+                                                {% for key, val in v["SharedContentDetails"].items()|sort() %}
                                                     {% if val is not none and val != "" %}
                                                         <tr>
-                                                        <td class="nowrap normal white">{{ key }}:</td>
+                                                        <td class="nowrap normal white">{{ key.replace("_"," ").title() }}:</td>
                                                         {% if key == "URI_DECODED_METADATA" or key == "SHARED_MESSAGE_FLAGS" or key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION"  %}
                                                             <td class="normal white small">
-                                                            {% for k, v in val.items() %}
-                                                              {% if key == "SHARED_CONTENT_FILE_METADATA" or key == "SHARED_CONTENT_FILE_LOCATION" and v is mapping %}
-                                                                {% for k2, v2 in v.items() %}
-                                                                  {{ k2 }}: {{ v2 }}<br>
+                                                            {% for k2, v2 in val.items() %}
+                                                              {% if key == "SHARED_CONTENT_FILE_METADATA" and v2 is mapping %}
+                                                                {% for k3, v3 in v2.items()|sort() %}
+                                                                  {% if links and k3 == "FILE_PATH" %}
+                                                                    {{ k3.replace("_"," ").title() }}: <a href="{{ url_for('serve', file=v3) }}" target="_blank">{{ v3 }}</a><br />
+                                                                  {% else %}
+                                                                    {{ k3.replace("_"," ").title() }}: {{ v3 }}<br />
+                                                                  {% endif %}
                                                                 {% endfor %}
+                                                                <br />
                                                               {% else %}
-                                                                {{ k }}: {{ v }}<br>
+                                                                {{ k2.replace("_"," ").title() }}: {{ v2 }}<br />
                                                               {% endif %}
                                                             {% endfor %}
                                                             </td>
@@ -211,20 +277,20 @@
                                                 {% endfor %}
                                                     </table>
                                             {% elif class == "msg sent fwd" or class == "msg sent theirquote" or class == "msg sent myquote" %}
-                                                <br/>
-                                                    <table class="attachment">
+                                                <br />
+                                                    <table class="attachment quote sent">
                                                     <tr><td></td></tr>
-                                                {{ msg|replace('\n', '<br>') |safe }}<p><br>
-                                                {% for key, val in v.MESSAGE.items() %}
+                                                {{ msg|replace('\n', '<br />') |safe }}<p><br>
+                                                {% for key, val in v.MESSAGE.items()|sort() %}
                                                     {% if key.startswith('QUOTE') %}
                                                     <tr>
-                                                        <td class="normal white small">{{ key }}: {{ val }}</td>
+                                                        <td class="normal white small">{{ key.replace("_"," ").title() }}: {{ val }}</td>
                                                     </tr>
                                                     {% endif %}
                                                 {% endfor %}
                                                 </table>
                                             {% else %}
-                                                {{ msg|replace('\n', '<br>') |safe }}
+                                                {{ msg|replace('\n', '<br />') |safe }}
                                             {% endif %}
                                             </div>
                                         </td>

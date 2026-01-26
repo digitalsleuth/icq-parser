@@ -31,12 +31,12 @@ import magic
 from PIL import Image
 
 try:
-    from icq_parser import icqweb
-    from icq_parser.icqweb import build_search_index
+    from icq_parser import icq_web
+    from icq_parser.icq_web import build_search_index
     from icq_parser.icq_enums import STATUS_ENUMS
 except ImportError:
-    import icqweb
-    from icqweb import build_search_index
+    import icq_web
+    from icq_web import build_search_index
     from icq_enums import STATUS_ENUMS
 
 ## Indexed length-prefixed records
@@ -47,7 +47,7 @@ except ImportError:
 ## TODO: include ignorelist as page
 ## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 PDFS = []
@@ -233,6 +233,7 @@ class DesktopParser:
     def __init__(self, start_path):
         folder_path = Path(start_path)
         self.folder_path = folder_path
+        self.ORIGINAL_PATH = ""
         self.TS = 0
         self.msg = None
         self.uid = None
@@ -659,7 +660,7 @@ class DesktopParser:
                 file_type = magic.from_file(file)
             except ValueError:
                 return None
-            if file_type.startswith("ASCII") or file_type.startswith("UTF-8"):
+            if file_type.startswith("ASCII") or file_type.startswith("UTF-8") or file_type.startswith("JSON"):
                 with open(file, encoding="utf-8") as f:
                     json_data = json.load(f)
                 for group in json_data["groups"]:
@@ -899,13 +900,13 @@ class DesktopParser:
                                     file_type, file_timestamp, file_size = (
                                         parse_file_id(file_id)
                                     )
-                                    file_metadata["URI_DECODED_CONTENT_TYPE"] = (
+                                    file_metadata["CONTENT_TYPE"] = (
                                         file_type
                                     )
-                                    file_metadata["URI_DECODED_CONTENT_TIMESTAMP"] = (
+                                    file_metadata["CONTENT_TIMESTAMP"] = (
                                         file_timestamp
                                     )
-                                    file_metadata["URI_DECODED_CONTENT_SIZE"] = (
+                                    file_metadata["CONTENT_SIZE"] = (
                                         file_size
                                     )
                                     self.SHARED_FILES[uid][MSG_ID][
@@ -1300,9 +1301,9 @@ class DesktopParser:
                         ftype, ftime, fsize = parse_file_id(uri)
                         self.MESSAGES[uid][msg_id]["SharedContentDetails"] = {
                             "URI_DECODED_METADATA": {
-                                "URI_DECODED_CONTENT_TYPE": ftype,
-                                "URI_DECODED_CONTENT_TIMESTAMP": ftime,
-                                "URI_DECODED_CONTENT_SIZE": fsize
+                                "CONTENT_TYPE": ftype,
+                                "CONTENT_TIMESTAMP": ftime,
+                                "CONTENT_SIZE": fsize
                             }
                         }
                         break
@@ -1325,7 +1326,7 @@ class DesktopParser:
             if md5_hash in MD5_LOOKUP:
                 cache_filename, data = MD5_LOOKUP[md5_hash]
                 hash_matches.append({
-                    'LOCAL_FILENAME': filename,
+                    'LOCAL_FILE_NAME': filename,
                     'METADATA_SOURCE': cache_filename,
                     'MD5': md5_hash,
                     'DATA': data
@@ -1344,7 +1345,7 @@ class DesktopParser:
             if hash_match["METADATA_SOURCE"] in FILE_LOOKUP:
                 msg_data = FILE_LOOKUP[hash_match["METADATA_SOURCE"]]
                 file_data = hash_match["DATA"]
-                file_data["LOCAL_FILENAME"] = os.path.join(self.CACHE_DIR, hash_match["LOCAL_FILENAME"])
+                file_data["LOCAL_FILE_NAME"] = os.path.join(self.CACHE_DIR, hash_match["LOCAL_FILE_NAME"])
                 file_data["METADATA_SOURCE"] = hash_match["METADATA_SOURCE"]
                 if related_dirs != {}:
                     json_source = file_data["METADATA_SOURCE"]
@@ -1352,6 +1353,8 @@ class DesktopParser:
                         if json_file == json_source:
                             file_data["ADDL_METADATA_DIRECTORY"] = os.path.join(self.CACHE_DIR, json_dir)
                             break
+                if self.ORIGINAL_PATH != "":
+                    file_data["ORIGINAL_SOURCE_PATH"] = os.path.join(self.ORIGINAL_PATH, f"content.cache\\{hash_match['LOCAL_FILE_NAME']}")
                 self.MESSAGES[msg_data['UID']][msg_data['MESSAGE_ID']]['SharedContentDetails']["SHARED_CONTENT_FILE_LOCATION"] = file_data
         if related_dirs != {}:
             for json_dir, json_file in related_dirs.items():
@@ -1414,6 +1417,8 @@ class DesktopParser:
                         MATCHES[match[0]]["URL_HASH"] = match[2]
                         MATCHES[match[0]]["TYPE"] = match[3]
                         MATCHES[match[0]]["SANITIZED_URL"] = sanitize(url)
+                        if self.ORIGINAL_PATH != "":
+                            MATCHES[match[0]]["ORIGINAL_SOURCE_PATH"] = f"{self.ORIGINAL_PATH}\\content.cache\\{match[0]}"
         return MATCHES
 
 
@@ -1423,6 +1428,7 @@ def get_json_contents(file_path):
     JSON_DATA = {}
     URL_DATA = {}
     file_name, file_size, file_md5, file_mime = (None,) * 4
+    local_path, last_modified_unix, last_modified_dt = (None, ) * 3
     dir_contents = os.listdir(file_path)
     dirs = {}
     matched_dirs = {}
@@ -1453,7 +1459,14 @@ def get_json_contents(file_path):
                         JSON_DATA[file]["MD5"] = file_md5
                     if file_mime:
                         JSON_DATA[file]["MIME"] = file_mime
-                    file_name, file_size, file_md5, file_mime = (None,) * 4
+                    if "local" in json_data and "local_path" in json_data["local"]:
+                        local_path = json_data["local"]["local_path"]
+                        last_modified_unix = json_data["local"]["last_modified"]
+                        last_modified_dt = convert_unix_ts(int(last_modified_unix))
+                        JSON_DATA[file]["LOCAL_PATH"] = local_path
+                        JSON_DATA[file]["LAST_MODIFIED_TS"] = last_modified_unix
+                        JSON_DATA[file]["LAST_MODIFIED_DATE_TIME"] = last_modified_dt
+                    file_name, file_size, file_md5, file_mime, local_path, last_modified_unix, last_modified_dt = (None,) * 7
                 if "doc" in json_data and "url" in json_data["doc"]:
                     if "fetch_ts" in json_data["doc"]:
                         ts = convert_unix_ts(int(json_data["doc"]["fetch_ts"]))
@@ -2037,6 +2050,7 @@ class iOSParser:
     def __init__(self, start_path):
         folder_path = Path(start_path)
         self.folder_path = folder_path
+        self.ORIGINAL_PATH = ""
         self.OWNER = {}
         self.AGENT = []
         self.AGENT_DB = ""
@@ -2828,6 +2842,15 @@ class iOSParser:
             self.FILE_DATA[file_id]["FILE_SENDER"] = entry[
                 ZMRGALLERYENTRY_hdr["ZSENDERUID"]
             ]
+            pid = entry[ZMRGALLERYENTRY_hdr["ZPID"]]
+            members = pid.split('|wim|')
+            sender = members.index(entry[ZMRGALLERYENTRY_hdr["ZSENDERUID"]])
+            recipient = None
+            if sender == 1:
+                recipient = members[0]
+            else:
+                recipient = members[1]
+            self.FILE_DATA[file_id]["FILE_RECIPIENT"] = recipient
             if "FILE_URL" in self.FILE_DATA[file_id] and self.FILE_DATA[file_id][
                 "FILE_URL"
             ].startswith("hxxps://files.icq.net"):
@@ -2982,12 +3005,12 @@ def split_table(db_table):
     return idx, data
 
 
-def start_web(IP, load_dir, links=False, printing=False, device=None, logger=None, index_only=False):
-    @icqweb.app.route("/static/<path:filename>")
+def start_web(IP, load_dir, links=False, print_save=False, device=None, logger=None, index_only=False):
+    @icq_web.app.route("/static/<path:filename>")
     def custom_static(filename):
         return send_from_directory(load_dir, filename)
 
-    icqweb.app.config["load"] = load_dir
+    icq_web.app.config["load"] = load_dir
     with open(f"{load_dir}{os.sep}contacts.json", encoding="utf-8") as json_contacts:
         contacts = json.load(json_contacts)
     with open(f"{load_dir}{os.sep}messages.json", encoding="utf-8") as json_messages:
@@ -2996,29 +3019,29 @@ def start_web(IP, load_dir, links=False, printing=False, device=None, logger=Non
         owner = json.load(json_owner)
     with open(f"{load_dir}{os.sep}files.json", encoding="utf-8") as json_files:
         files = json.load(json_files)
-    icqweb.app.config["CONTACTS"] = contacts
-    icqweb.app.config["MESSAGES"] = messages
-    icqweb.app.config["OWNER"] = owner
-    icqweb.app.config["LINKS"] = links
-    icqweb.app.config["FILES"] = files
-    icqweb.app.config["DEVICE"] = device
-    icqweb.app.config["SERVER_NAME"] = f"{IP}:5000"
-    icqweb.app.config["APPLICATION_ROOT"] = "/"
-    icqweb.app.config["PREFERRED_URL_SCHEME"] = "http"
-    icqweb.app.config["PRINTING"] = printing
-    icqweb.app.config["TESTING"] = False
-    if not printing and "SEARCH_INDEX" not in icqweb.app.config:
+    icq_web.app.config["CONTACTS"] = contacts
+    icq_web.app.config["MESSAGES"] = messages
+    icq_web.app.config["OWNER"] = owner
+    icq_web.app.config["LINKS"] = links
+    icq_web.app.config["FILES"] = files
+    icq_web.app.config["DEVICE"] = device
+    icq_web.app.config["SERVER_NAME"] = f"{IP}:5000"
+    icq_web.app.config["APPLICATION_ROOT"] = "/"
+    icq_web.app.config["PREFERRED_URL_SCHEME"] = "http"
+    icq_web.app.config["PRINTING"] = print_save
+    icq_web.app.config["TESTING"] = False
+    if not print_save and "SEARCH_INDEX" not in icq_web.app.config:
         if os.path.exists(f"{load_dir}{os.sep}index.icq") and not index_only:
             with open(f"{load_dir}{os.sep}index.icq", "r", encoding="utf-8") as index_file:
-                icqweb.app.config["SEARCH_INDEX"] = json.load(index_file)
+                icq_web.app.config["SEARCH_INDEX"] = json.load(index_file)
         else:
             logger.info("Generating search index ...")
-            icqweb.app.config["SEARCH_INDEX"] = build_search_index(icqweb.app)
+            icq_web.app.config["SEARCH_INDEX"] = build_search_index(icq_web.app)
             if index_only:
                 logger.info(f"Saving index to {load_dir}{os.sep}index.icq.")
-                with open(f"{load_dir}{os.sep}index.icq", "w", encoding="utf-8") as index_file:
-                    idx = icqweb.app.config["SEARCH_INDEX"]
-                    json.dump(idx, index_file)
+                with open(f"{load_dir}{os.sep}index.icq", "w", encoding="utf-8", newline='\r\n') as index_file:
+                    idx = icq_web.app.config["SEARCH_INDEX"]
+                    json.dump(idx, index_file, indent=2, ensure_ascii=False)
                 if logger:
                     logger.info(f"{load_dir}{os.sep}index.icq index saved.")
                 return
@@ -3028,7 +3051,7 @@ def start_web(IP, load_dir, links=False, printing=False, device=None, logger=Non
     cli.show_server_banner = lambda *x: None
     if logger:
         logger.info(f"Starting the webserver at http://{IP}:5000")
-    icqweb.app.run(host=IP, debug=False, use_reloader=False)
+    icq_web.app.run(host=IP, debug=False, use_reloader=False)
 
 
 async def generate_pdf(pages, logger=None, timeout=7200):
@@ -3214,7 +3237,7 @@ def wait_for_server(url):
 
 
 def save_output(content, filename):
-    with open(filename, "w", encoding="utf-8") as json_file:
+    with open(filename, "w", encoding="utf-8", newline='\r\n') as json_file:
         json.dump(content, json_file, indent=2, ensure_ascii=False)
 
 
@@ -3260,7 +3283,7 @@ def main():
         "desktop", help="process desktop artifacts"
     )
     save_parser = subparsers.add_parser(
-        "save", help="Save the Flask website locally for offline viewing"
+        "save", help="Save the Flask website or PDFs locally for offline viewing"
     )
     save_device = save_parser.add_subparsers(dest="device", title="Device Type")
     ios_process.add_argument(
@@ -3282,6 +3305,11 @@ def main():
         action="store_true",
         help="generates a log file",
     )
+    ios_process.add_argument(
+        "--opath",
+        metavar="<PATH>",
+        help="source path on original evidence object",
+    )
     desktop_process.add_argument(
         "-s",
         "--source",
@@ -3301,6 +3329,11 @@ def main():
         action="store_true",
         help="generates a log file",
     )
+    desktop_process.add_argument(
+        "--opath",
+        metavar="<PATH>",
+        help="source path on original evidence object",
+    )        
     ios_load = load_device.add_parser("ios", help="load iOS artifacts")
     desktop_load = load_device.add_parser("desktop", help="load desktop artifacts")
     ios_load.add_argument(
@@ -3316,31 +3349,13 @@ def main():
         help="Enable clickable links.",
         action="store_true",
         default=False,
-    )
-    ios_load.add_argument(
-        "-p",
-        "--print",
-        help="Path to store the PDF-printed webpages.",
-        metavar="<PATH>",
-    )
-    ios_load.add_argument(
-        "-m",
-        "--merge",
-        help="Merge PDFs into a single PDF, requires -p/--print",
-        action="store_true",
-    )
+    )    
     ios_load.add_argument(
         "-s",
         "--source",
         metavar="<PATH>",
         help="Path to the source JSON files to display in the web interface",
         required=True,
-    )
-    ios_load.add_argument(
-        "-t",
-        "--timeout",
-        help="Provide a timeout value in seconds for the PDF to PNG generation for large pages",
-        default=7200,
     )
     ios_load.add_argument(
         "--debug",
@@ -3367,18 +3382,6 @@ def main():
         default=False,
     )
     desktop_load.add_argument(
-        "-p",
-        "--print",
-        help="Path to store the PDF-printed webpages.",
-        metavar="<PATH>",
-    )
-    desktop_load.add_argument(
-        "-m",
-        "--merge",
-        help="Merge PDFs into a single PDF, requires -p/--print",
-        action="store_true",
-    )
-    desktop_load.add_argument(
         "-s",
         "--source",
         metavar="<PATH>",
@@ -3386,56 +3389,79 @@ def main():
         required=True,
     )
     desktop_load.add_argument(
+        "--debug",
+        help="Rapid relaunch of script for debugging without indexing",
+        action="store_true",
+    )
+    desktop_load.add_argument(
+        "--log",
+        action="store_true",
+        help="generates a log file",
+    )
+    ios_save = save_device.add_parser("ios", help="save data from iOS processing results")
+    ios_save.add_argument(
+        "-i",
+        "--ip",
+        metavar="<IP>",
+        help="IPv4 address to use for the web interface",
+        default="127.0.0.1",
+    )
+    ios_save.add_argument(
+        "-l",
+        "--links",
+        help="Enable clickable links.",
+        action="store_true",
+        default=False,
+    )
+    ios_save.add_argument(
+        "-s",
+        "--source",
+        metavar="<PATH>",
+        help="Path to the source JSON files to display in the web interface",
+        required=True,
+    )
+    ios_save.add_argument(
+        "-d",
+        "--dest",
+        metavar="<PATH>",
+        help="Location to save the downloaded webpage",
+        required=True,
+    )
+    ios_save.add_argument(
+        "--log",
+        action="store_true",
+        help="generates a log file",
+    )
+    ios_save.add_argument(
+        "-p",
+        "--print",
+        help="Saves the PDF-printed webpages.",
+        action="store_true",
+    )
+    ios_save.add_argument(
+        "-m",
+        "--merge",
+        help="Merge PDFs into a single PDF, requires -p/--print",
+        action="store_true",
+    )
+    ios_save.add_argument(
+        "-w",
+        "--webpage",
+        help="Saves the ICQ Parser webpage locally",
+        action="store_true",
+    )
+    ios_save.add_argument(
         "-t",
         "--timeout",
         help="Provide a timeout value in seconds for the PDF to PNG generation for large pages",
         default=7200,
     )        
-    desktop_load.add_argument(
+    ios_save.add_argument(
         "--debug",
-        help="Rapid relaunch of script for debugging without indexing",
+        help="Rapid relaunch without indexing, for debugging",
         action="store_true",
     )
-    desktop_load.add_argument(
-        "--log",
-        action="store_true",
-        help="generates a log file",
-    )
-    ios_save = save_device.add_parser("ios", help="save iOS webpage")
-    ios_save.add_argument(
-        "-i",
-        "--ip",
-        metavar="<IP>",
-        help="IPv4 address to use for the web interface",
-        default="127.0.0.1",
-    )
-    ios_save.add_argument(
-        "-l",
-        "--links",
-        help="Enable clickable links.",
-        action="store_true",
-        default=False,
-    )
-    ios_save.add_argument(
-        "-s",
-        "--source",
-        metavar="<PATH>",
-        help="Path to the source JSON files to display in the web interface",
-        required=True,
-    )
-    ios_save.add_argument(
-        "-d",
-        "--dest",
-        metavar="<PATH>",
-        help="Location to save the downloaded webpage",
-        required=True,
-    )
-    ios_save.add_argument(
-        "--log",
-        action="store_true",
-        help="generates a log file",
-    )
-    desktop_save = save_device.add_parser("desktop", help="save desktop webpage")
+    desktop_save = save_device.add_parser("desktop", help="save data from desktop processing results")
     desktop_save.add_argument(
         "-i",
         "--ip",
@@ -3461,7 +3487,7 @@ def main():
         "-d",
         "--dest",
         metavar="<PATH>",
-        help="Location to save the downloaded webpage",
+        help="Location to save the downloaded data",
         required=True,
     )
     desktop_save.add_argument(
@@ -3469,6 +3495,35 @@ def main():
         action="store_true",
         help="generates a log file",
     )
+    desktop_save.add_argument(
+        "-p",
+        "--print",
+        help="Saves the PDF-printed webpages.",
+        action="store_true",
+    )
+    desktop_save.add_argument(
+        "-m",
+        "--merge",
+        help="Merge PDFs into a single PDF, requires -p/--print",
+        action="store_true",
+    )
+    desktop_save.add_argument(
+        "-w",
+        "--webpage",
+        help="Saves the ICQ Parser webpage locally",
+        action="store_true",
+    )
+    desktop_save.add_argument(
+        "-t",
+        "--timeout",
+        help="Provide a timeout value in seconds for the PDF to PNG generation for large pages",
+        default=7200,
+    )        
+    desktop_save.add_argument(
+        "--debug",
+        help="Rapid relaunch without indexing, for debugging",
+        action="store_true",
+    )    
     args = arg_parse.parse_args()
     if args.action == "process" and args.device == "ios":
         if not os.path.exists(args.source) and not os.path.isdir(args.source):
@@ -3485,6 +3540,8 @@ def main():
         logger.info(f"Processing start time: {start}")
         logger.info(f"Identifying content in {os.path.abspath(args.source)} ...")
         iparser = iOSParser(os.path.normpath(os.path.abspath(args.source)))
+        if args.opath:
+            iparser.ORIGINAL_PATH = args.opath
         logger.info("Processing owner info ...")
         logger.info(f"Owner UID found: {iparser.UID}")
         logger.info(
@@ -3548,7 +3605,7 @@ def main():
             "127.0.0.1",
             dest_path,
             links=True,
-            printing=False,
+            print_save=False,
             device=args.device,
             logger=logger,
             index_only=True,
@@ -3578,10 +3635,13 @@ def main():
             logger.info(f"Processing start time: {start}")
             logger.info(f"Identifying content in {os.path.abspath(args.source)} ...")
             dparser = DesktopParser(os.path.abspath(args.source))
+            if args.opath:
+                dparser.ORIGINAL_PATH = args.opath
         else:
-            arg_parse.error(
-                f"[!] The path {args.source} does not exist. Please check your path and try again."
+            logger.error(
+                f"The path {args.source} does not exist. Please check your path and try again."
             )
+            raise SystemExit(1)
         if dparser.INFO_CACHE_FILES:
             logger.info("Processing users profile information cache ... ")
             dparser.get_info_cache()
@@ -3675,7 +3735,7 @@ def main():
             "127.0.0.1",
             dest_path,
             links=True,
-            printing=False,
+            print_save=False,
             device=args.device,
             logger=logger,
             index_only=True,
@@ -3697,65 +3757,6 @@ def main():
             ipaddress.ip_address(args.ip)
         except ValueError:
             arg_parse.error(f"[!] The IP address {args.ip} is not a valid IP address")
-        if not (
-            os.path.exists(f"{args.source}{os.sep}contacts.json")
-            and os.path.exists(f"{args.source}{os.sep}messages.json")
-            and os.path.exists(f"{args.source}{os.sep}owner.json")
-        ):
-            arg_parse.error(
-                f"[!] The path {args.source} does not exist, or one or all of the files contact/messages/owner.json are not present in the directory."
-            )
-        load_path = f"{os.path.normpath(os.path.abspath(args.source))}{os.sep}"
-        if args.print and os.path.exists(args.print) and os.path.isdir(args.print):
-            log_path = f"{os.path.normpath(os.path.abspath(args.print))}{os.sep}"
-        elif args.print and not (os.path.exists(args.print) or not os.path.isdir(args.print)):
-            arg_parse.error(f"[!] The output path for the PDFs - {args.print} - does not exist! Please check your path and try again.")
-        else:
-            log_path = load_path
-        logger = log_output(log_path, args.log)
-        logger.info(f"Loading json files from {load_path}")
-        if args.merge and not args.print:
-            arg_parse.error(
-                "[!] The -m/--merge option requires -p/--print for PDFs to be generated first.\nMake sure you include both of these to merge the PDFs."
-            )
-        if args.print and os.path.exists(args.print) and os.path.isdir(args.print):
-            output_path = f"{os.path.normpath(os.path.abspath(args.print))}"
-            url = f"http://{args.ip}:5000"
-            try:
-                printing = True
-                flask_thread = threading.Thread(
-                    target=start_web,
-                    args=(args.ip, load_path, args.links, printing, args.device, logger),
-                    daemon=True,
-                )
-                flask_thread.start()
-            except Exception as e:
-                arg_parse.error(f"[!] Unable to start the web server: {e}")
-            wait_for_server(url)
-            logger.info("Gathering list of PDFs to generate ...")
-            print_to_pdf(url, output_path, logger, timeout=args.timeout)
-            if args.merge:
-                merge_pdfs(f"{output_path}{os.sep}ICQ-Content-Combined.pdf")
-        else:
-            url = f"http://{args.ip}:5000"
-            try:
-                start_web(
-                    args.ip,
-                    load_path,
-                    links=args.links,
-                    printing=args.debug,
-                    device=args.device,
-                    logger=logger,
-                )
-            except Exception as e:
-                arg_parse.error(f"[!] Unable to start the web server: {e}")
-    if args.action == "save" and args.device in {"ios", "desktop"}:
-        source_path = None
-        dest_path = None
-        try:
-            ipaddress.ip_address(args.ip)
-        except ValueError:
-            arg_parse.error(f"The IP address {args.ip} is not a valid IP address")
         url = f"http://{args.ip}:5000"
         if not (
             os.path.exists(f"{args.source}{os.sep}contacts.json")
@@ -3765,45 +3766,141 @@ def main():
             arg_parse.error(
                 f"[!] The path {args.source} does not exist, or one or all of the files contact/messages/owner.json are not present in the directory."
             )
+        load_path = f"{os.path.normpath(os.path.abspath(args.source))}{os.sep}"
+        log_path = load_path
+        logger = log_output(log_path, args.log)
+        logger.info(f"Loading json files from {load_path}")
+        try:
+            start_web(
+                args.ip,
+                load_path,
+                links=args.links,
+                print_save=args.debug,
+                device=args.device,
+                logger=logger,
+            )
+        except Exception as e:
+            logger.error(f"Unable to start the web server: {e}")
+    if args.action == "save" and args.device in {"ios", "desktop"}:
+        if not (
+            os.path.exists(f"{args.source}{os.sep}contacts.json")
+            and os.path.exists(f"{args.source}{os.sep}messages.json")
+            and os.path.exists(f"{args.source}{os.sep}owner.json")
+        ):
+            arg_parse.error(
+                f"[!] The path {args.source} does not exist, or one or all of the files contact/messages/owner.json are not present in the directory."
+            )
         source_path = f"{os.path.normpath(os.path.abspath(args.source))}{os.sep}"
+        load_path = source_path
         if args.dest and not (os.path.exists(args.dest) and os.path.isdir(args.dest)):
             arg_parse.error(
                 f"[!] The path {args.dest} does not exist for output. Please check your path and try again"
             )
         dest_path = f"{os.path.normpath(os.path.abspath(args.dest))}"
-        logger = log_output(dest_path, args.log)
-        logger.info(f"Loading json files from {source_path}.")
+        log_path = f"{dest_path}{os.sep}"
+        logger = log_output(log_path, args.log)
+        if not args.print and not args.webpage:
+            logger.error(
+                "The -p/--print or -w/--webpage options are required when using the 'save' option. Both can be used, but at least one must be selected."
+            )
+            raise SystemExit(1)
         try:
-            saving = True
+            ipaddress.ip_address(args.ip)
+        except ValueError:
+            logger.error(f"The IP address {args.ip} is not a valid IP address")
+            raise SystemExit(1)
+        url = f"http://{args.ip}:5000"
+        pdf_path = f"{dest_path}{os.sep}pdfs"
+        web_path = f"{dest_path}{os.sep}web"
+        if args.merge and not args.print:
+            logger.error(
+                "The -m/--merge option requires -p/--print for PDFs to be generated first.\nMake sure you include both of these to merge the PDFs."
+            )
+            raise SystemExit(1)
+        logger.info(f"Loading json files from {load_path}")
+        try:
             flask_thread = threading.Thread(
                 target=start_web,
-                args=(args.ip, source_path, args.links, saving, args.device, logger),
+                args=(args.ip, load_path, args.links, True, args.device, logger),
                 daemon=True,
             )
             flask_thread.start()
         except Exception as e:
-            arg_parse.error(f"[!] Unable to start the web server: {e}")
-        wait_for_server(url)
-        try:
-            project_name = "ICQ_PARSER_WEBSITE_OUTPUT"
-            logger.info(f"Preparing to save website data to {dest_path}{os.sep}{project_name}")
-            save_website(
-                url,
-                project_folder=dest_path,
-                project_name=project_name,
-                bypass_robots=True,
-                debug=False,
-                threaded=False,
-                delay=None,
-                open_in_browser=False,
-            )
-        except Exception as e:
-            logger.error(f"Unable to save website: {e}")
-            return
-        logger.info(f"Website download finished - saved to {dest_path}{os.sep}{project_name}.")
-        flask_thread._tstate_lock.release_lock()
-        flask_thread._stop()
+            logger.error(f"Unable to start the web server: {e}")
+            raise SystemExit(1)
+        wait_for_server(url)        
+        if args.print:
+            try:
+                os.mkdir(pdf_path)
+                output_path = pdf_path
+                logger.info(
+                    f"Created 'pdfs' folder in {dest_path} for output."
+                )
+            except PermissionError:
+                logger.warning(
+                    f"Unable to create folder {pdf_path}.\n"
+                    f"Defaulting back to {dest_path} as the destination."
+                )
+                output_path = dest_path
+            except FileExistsError:
+                if os.path.isdir(pdf_path):
+                    logger.warning(
+                        f"A folder named 'pdfs' exists in {dest_path} and will be used for output."
+                    )
+                    output_path = pdf_path
+                else:
+                    logger.warning(
+                        f"A file named {pdf_path} exists, so sub-folder 'pdfs' will NOT be created."
+                    )
+                    output_path = dest_path
+            logger.info("Gathering list of PDFs to generate ...")
+            print_to_pdf(url, output_path, logger, timeout=args.timeout)
+            if args.merge:
+                merge_pdfs(f"{output_path}{os.sep}ICQ-Content-Combined.pdf")
+        if args.webpage:
+            try:
+                os.mkdir(web_path)
+                output_path = web_path
+                logger.info(
+                    f"Created 'web' folder in {dest_path} for output."
+                )
+            except PermissionError:
+                logger.warning(
+                    f"Unable to create folder {web_path}.\n"
+                    f"Defaulting back to {dest_path} as the destination."
+                )
+                output_path = dest_path
+            except FileExistsError:
+                if os.path.isdir(web_path):
+                    logger.warning(
+                        f"A folder named 'web' exists in {dest_path} and will be used for output."
+                    )
+                    output_path = web_path
+                else:
+                    logger.warning(
+                        f"A file named {web_path} exists, so sub-folder 'web' will NOT be created."
+                    )
+                    output_path = dest_path
+            try:
+                project_name = "ICQ_PARSER_WEBSITE_OUTPUT"
+                logger.info(f"Preparing to save website data to {output_path}{os.sep}{project_name}")
+                save_website(
+                    url,
+                    project_folder=output_path,
+                    project_name=project_name,
+                    bypass_robots=True,
+                    debug=False,
+                    threaded=False,
+                    delay=None,
+                    open_in_browser=False,
+                )
+            except Exception as e:
+                logger.error(f"Unable to save website: {e}")
+                return
+            logger.info(f"Website download finished - saved to {output_path}{os.sep}{project_name}.")
         logger.info("Web server stopped.")
+        flask_thread._tstate_lock.release_lock()
+        flask_thread._stop()        
 
 
 if __name__ == "__main__":

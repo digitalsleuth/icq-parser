@@ -3,7 +3,8 @@
 import os
 import re
 import logging
-from flask import Flask, render_template, url_for, send_from_directory, request
+import magic
+from flask import Flask, render_template, url_for, send_from_directory, request, make_response
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
@@ -124,7 +125,11 @@ def attachments():
 def serve(file):
     dirname = os.path.dirname(os.path.abspath(file))
     filename = os.path.basename(os.path.abspath(file))
-    return send_from_directory(dirname, filename, as_attachment=False)
+    mime = magic.Magic(mime=True)
+    mime_type = mime.from_file(os.path.join(dirname, filename))
+    response = make_response(send_from_directory(dirname, filename, as_attachment=False, mimetype=mime_type))
+    response.headers['Content-Disposition'] = 'inline'
+    return response
 
 
 def get_avatar(contact):

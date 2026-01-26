@@ -37,27 +37,45 @@
             <br />
             <table>
                 {% if contact != "IgnoreList" %}
-                {% for k, v in contacts[contact].items() | sort %}
+                  {% for k, v in contacts[contact].items() | sort %}
                     {% if k in ("MediaInCommon", "ConversationState", "GalleryContentDetails") %}
-                        {% set v = v.items() | map('join', ': ') | join('<br>') %}
+                        {% set temp_list = [] %}
+                        {% for k2, val in v.items() | sort() %}
+                          {% if k2 == "FLAGS" %}
+                            {% set formatted_val = '<br />&nbsp;&nbsp;&nbsp;&nbsp;' ~ (val.items()|sort() | map('join', ': ') | join('<br />&nbsp;&nbsp;&nbsp;&nbsp;')) %}
+                            {% set _ = temp_list.append(k2.replace("_", " ").title() ~ ': ' ~ formatted_val) %}
+                          {% else %}
+                            {% set _ = temp_list.append(k2.replace("_", " ").title() ~ ': ' ~ val) %}
+                          {% endif %}
+                        {% endfor %}
+                        {% set v = temp_list | join('<br />') %}
+                    {% elif k == "Capabilities" and v %}
+                      {% set temp_list = [] %}
+                      {% for each in v %}
+                        {% set val = each.split(" - ")[0].replace("_", " ").title() %}
+                        {% if val is not none %}
+                          {% set _ = temp_list.append(val) %}
+                        {% endif %}
+                      {% endfor %}
+                      {% set v = temp_list | join('<br />') %}
                     {% else %}
-                        {% set v = v %}
+                      {% set v = v %}
                     {% endif %}
                     <tr>
-                        <td class="nowrap">{{ k }}</td>
-                        <td class="short">
-                            {% if k in ["AvatarOriginal", "AvatarPreview", "AvatarOther"] and v is not none and links %}
-                                <a href="{{ url_for('serve', file=v) }}" />{{ v }}
-                            {% elif k == "SearchQueries" %}
-                              {% for key, val in v.items() %}
-                                {{ val.DATE }} - {{ val.QUERY }}<br/>
-                              {% endfor %}
-                            {% else %}
-                                {{ v | safe }}
-                            {% endif %}
-                        </td>
+                      <td class="nowrap">{{ k }}</td>
+                      <td class="short">
+                    {% if k in ["AvatarOriginal", "AvatarPreview", "AvatarOther"] and v is not none and links %}
+                      <a href="{{ url_for('serve', file=v) }}" >{{ v }}</a>
+                    {% elif k == "SearchQueries" %}
+                      {% for key, val in v.items() %}
+                        {{ val.DATE }} - {{ val.QUERY }}<br />
+                      {% endfor %}
+                    {% else %}
+                      {{ v | safe }}
+                    {% endif %}
+                      </td>
                     </tr>
-                {% endfor %}
+                  {% endfor %}
                 {% endif %}
             </table>
         </div>
