@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 
 a = Analysis(
     ['icq_parser/icq_parser.py'],

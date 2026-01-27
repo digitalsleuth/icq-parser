@@ -61,6 +61,8 @@ table.attachment.meta, table.attachment.quote {
 }
 table.attachment.meta.rcvd { background-color: #027d02; float: left; }
 table.attachment.meta.sent { background-color: #4682b4; float: right; }
+table.attachment.meta.rcvd.spacer { margin-top: 40px; }
+table.attachment.meta.sent.spacer { margin-top: 40px; }
 table.attachment.quote.rcvd { background-color: #3CB371; float: left;  margin-bottom: 40px; }
 table.attachment.quote.sent { background-color: #4169e1; float: right; margin-bottom: 40px; }
 .t1 tr:nth-child(even) { background-color: #f1f1f1; }

@@ -77,75 +77,53 @@
                                     <td class="{{ class }}">
                                         <div class="bubble">
                                             {% if "FILE" in v %}
-                                                {% set file_key = v.MESSAGE.FILE_ID|string %}
-                                                {% if "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] and links %}
-                                                    {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
-                                                    <a href="{{ url_for('serve', file=file) }}" target="_blank">
-                                                        <img src="{{ url_for('static', filename='play.png') }}"
-                                                             alt="{{ file }}"
-                                                             title="{{ file }}"
-                                                             class="play">
-                                                    </a>
-                                                    <br />
-                                                    <br />
-                                                {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] %}
-                                                    {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
-                                                    <img src="{{ url_for('static', filename='play.png') }}"
-                                                         alt="{{ file }}"
-                                                         title="{{ file }}"
-                                                         class="play">
-                                                    <br />
-                                                    <br />
-                                                {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] %}
-                                                    <img src="{{ url_for('static', filename='play.png') }}"
-                                                         alt="Audio File"
-                                                         title="Audio File"
-                                                         class="play">
-                                                    <br />
-                                                    <br />
-                                                {% endif %}
-                                                {% if "FILE_STORAGE_PREVIEW_FILENAME_EXISTS" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] is not none and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] != "" %}
-                                                    {% set file = v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] %}
-                                                    {% if links %}
-                                                        <a href="{{ url_for('serve', file=file) }}" target="_blank">
-                                                            <img src="{{ url_for('serve', file=file) }}"
-                                                                 alt="{{ file }}"
-                                                                 title="{{ file }}"
-                                                                 class="preview">
-                                                        </a>
-                                                        <br />
-                                                        <br />
-                                                    {% else %}
-                                                        <img src="{{ url_for('serve', file=file) }}"
-                                                             alt="{{ file }}"
-                                                             title="{{ file }}"
-                                                             class="preview">
-                                                             <br />
-                                                             <br />
-                                                    {% endif %}
-                                                    <br />
-                                                {% endif %}
-                                                {% if "FILE_CAPTION" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_CAPTION"] is not none and v["FILE"][file_key]["FILE_CAPTION"] != "" %}
-                                                    <br />
-                                                    <p>{{ v["FILE"][file_key]["FILE_CAPTION"] }}</p>
-                                                    <p>
-                                                        <br />
-                                                    {% endif %}
-                                                    <br />
-                                                    <table class="attachment meta rcvd">
-                                                    <tr><td></td></tr>
-                                                        {% for key, val in v["FILE"][file_key].items() %}
-                                                            {% if val is not none and val != "" and key != "FILE_CAPTION" %}
-                                                                <tr class="t3">
-                                                                    <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
-                                                                    <td class="normal white small">{{ val }}</td>
-                                                                </tr>
-                                                            {% endif %}
-                                                        {% endfor %}
-                                                    </table>
+                                              {% set file_key = v.MESSAGE.FILE_ID|string %}
+                                              {% if "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] and links %}
+                                                {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
+                                                  <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                                  <img src="{{ url_for('static', filename='play.png') }}" alt="{{ file }}" title="{{ file }}" class="play">
+                                                  </a><br /><br />
+                                              {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] %}
+                                                {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
+                                                  <img src="{{ url_for('static', filename='play.png') }}" alt="{{ file }}" title="{{ file }}" class="play"><br /><br />
+                                              {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] %}
+                                                <img src="{{ url_for('static', filename='play.png') }}" alt="Audio File" title="Audio File" class="play"><br /><br />
+                                              {% endif %}
+                                              {% if "FILE_STORAGE_PREVIEW_FILENAME_EXISTS" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] is not none and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] != "" %}
+                                                {% set file = v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] %}
+                                                {% if links %}
+                                                  <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                                  <img src="{{ url_for('serve', file=file) }}" alt="{{ file }}" title="{{ file }}" class="preview"></a><br /><br />
                                                 {% else %}
-                                                    {{ msg|replace('\n', '<br />') |safe }}
+                                                  <img src="{{ url_for('serve', file=file) }}" alt="{{ file }}" title="{{ file }}" class="preview"><br /><br />
                                                 {% endif %}
+                                                  <br />
+                                              {% endif %}
+                                              {% if "FILE_CAPTION" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_CAPTION"] is not none and v["FILE"][file_key]["FILE_CAPTION"] != "" %}
+                                                <br />
+                                                <p>{{ v["FILE"][file_key]["FILE_CAPTION"] }}</p>
+                                                <p><br />
+                                              {% endif %}
+                                              <br />
+                                              {% if msg is none and not file %}
+                                                {% set class = "attachment meta rcvd spacer" %}
+                                              {% else %}
+                                                {% set class = "attachment meta rcvd" %}
+                                              {% endif %}
+                                              <table class="{{ class }}">
+                                              <tr><td></td></tr>
+                                              {% for key, val in v["FILE"][file_key].items() %}
+                                                {% if val is not none and val != "" and key != "FILE_CAPTION" %}
+                                                  <tr class="t3">
+                                                  <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
+                                                  <td class="normal white small">{{ val }}</td>
+                                                  </tr>
+                                                {% endif %}
+                                              {% endfor %}
+                                              </table>
+                                            {% else %}
+                                              {{ msg|replace('\n', '<br />') |safe }}
+                                            {% endif %}
                                             </div>
                                         </td>
                                     </tr>
@@ -161,91 +139,66 @@
                                         {% set msg = v.MESSAGE.PART_TEXT %}
                                     {% endif %}
                                     <tr class="msg sent">
-                                        <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
-                                        <td class="nowrap normal">{{ owner.UID }}</td>
-                                        {% if "FILE" in v %}
-                                            {% set class = "msg sent attachment" %}
-                                        {% endif %}
-                                        <td class="{{ class }}">
-                                            <div class="bubble">
-                                                {% if "FILE" in v %}
-                                                    {% set file_key = v.MESSAGE.FILE_ID|string %}
-                                                    {% if "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] and links %}
-                                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
-                                                        <a href="{{ url_for('serve', file=file) }}" target="_blank">
-                                                            <img src="{{ url_for('static', filename='play.png') }}"
-                                                                 alt="{{ file }}"
-                                                                 title="{{ file }}"
-                                                                 class="play">
-                                                        </a>
-                                                        <br />
-                                                        <br />
-                                                    {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] %}
-                                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
-                                                        <img src="{{ url_for('static', filename='play.png') }}"
-                                                             alt="{{ file }}"
-                                                             title="{{ file }}"
-                                                             class="play">
-                                                        <br />
-                                                        <br />
-                                                    {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] %}
-                                                        <img src="{{ url_for('static', filename='play.png') }}"
-                                                             alt="Audio File"
-                                                             title="Audio File"
-                                                             class="play">
-                                                        <br />
-                                                        <br />
-                                                    {% endif %}
-                                                    {% if "FILE_STORAGE_PREVIEW_FILENAME_EXISTS" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] is not none and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] != "" %}
-                                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] %}
-                                                        {% if links %}
-                                                            <a href="{{ url_for('serve', file=file) }}" target="_blank">
-                                                                <img src="{{ url_for('serve', file=file) }}"
-                                                                     alt="{{ file }}"
-                                                                     title="{{ file }}"
-                                                                     class="preview">
-                                                            </a>
-                                                            <br />
-                                                            <br />
-                                                        {% else %}
-                                                            <img src="{{ url_for('serve', file=file) }}"
-                                                                 alt="{{ file }}"
-                                                                 title="{{ file }}"
-                                                                 class="preview">
-                                                            <br />
-                                                            <br />
-                                                        {% endif %}
-                                                        <br />
-                                                    {% endif %}
-                                                    {% if "FILE_CAPTION" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_CAPTION"] is not none and v["FILE"][file_key]["FILE_CAPTION"] != "" %}
-                                                        <br />
-                                                        <p>{{ v["FILE"][file_key]["FILE_CAPTION"] }}</p>
-                                                        <p>
-                                                            <br />
-                                                        {% endif %}
-                                                        <br />
-                                                        <table class="attachment meta sent">
-                                                        <tr><td></td></tr>
-                                                            {% for key, val in v["FILE"][file_key].items() %}
-                                                                {% if val is not none and val != "" and key != "FILE_CAPTION" %}
-                                                                    <tr>
-                                                                        <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
-                                                                        <td class="normal white small">{{ val }}</td>
-                                                                    </tr>
-                                                                {% endif %}
-                                                            {% endfor %}
-                                                        </table>
-                                                    {% else %}
-                                                        {{ msg|replace('\n', '<br />') |safe }}
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                    <td class="nowrap normal">{{ v.MESSAGE.TIME }}</td>
+                                    <td class="nowrap normal">{{ owner.UID }}</td>
+                                    {% if "FILE" in v %}
+                                      {% set class = "msg sent attachment" %}
                                     {% endif %}
-                                {% endfor %}
-                            {% endif %}
-                        </table>
-                    </div>
-                    <br />
-                </body>
-            </html>
+                                    <td class="{{ class }}">
+                                    <div class="bubble">
+                                    {% if "FILE" in v %}
+                                      {% set file_key = v.MESSAGE.FILE_ID|string %}
+                                      {% if "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] and links %}
+                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
+                                        <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                        <img src="{{ url_for('static', filename='play.png') }}" alt="{{ file }}" title="{{ file }}" class="play"></a><br /><br />
+                                      {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] and "FILE_STORAGE_CONTENT_FILENAME_EXISTS" in v["FILE"][file_key] %}
+                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_CONTENT_FILENAME_EXISTS"] %}
+                                        <img src="{{ url_for('static', filename='play.png') }}" alt="{{ file }}" title="{{ file }}" class="play"><br /><br />
+                                      {% elif "audio" in v["FILE"][file_key]["FILE_TYPE"] %}
+                                        <img src="{{ url_for('static', filename='play.png') }}" alt="Audio File" title="Audio File" class="play"><br /><br />
+                                      {% endif %}
+                                      {% if "FILE_STORAGE_PREVIEW_FILENAME_EXISTS" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] is not none and v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] != "" %}
+                                        {% set file = v["FILE"][file_key]["FILE_STORAGE_PREVIEW_FILENAME_EXISTS"] %}
+                                        {% if links %}
+                                          <a href="{{ url_for('serve', file=file) }}" target="_blank">
+                                          <img src="{{ url_for('serve', file=file) }}" alt="{{ file }}" title="{{ file }}" class="preview"></a><br /><br />
+                                        {% else %}
+                                          <img src="{{ url_for('serve', file=file) }}" alt="{{ file }}" title="{{ file }}" class="preview"><br /><br />
+                                        {% endif %}
+                                        <br />
+                                      {% endif %}
+                                      {% if "FILE_CAPTION" in v["FILE"][file_key] and v["FILE"][file_key]["FILE_CAPTION"] is not none and v["FILE"][file_key]["FILE_CAPTION"] != "" %}
+                                        <br /><p>{{ v["FILE"][file_key]["FILE_CAPTION"] }}</p><p><br />
+                                      {% endif %}
+                                      <br />
+                                      {% if msg is none and not file %}
+                                        {% set class = "attachment meta sent spacer" %}
+                                      {% else %}
+                                        {% set class = "attachment meta sent" %}
+                                      {% endif %}
+                                      <table class="{{ class }}">
+                                      <tr><td></td></tr>
+                                      {% for key, val in v["FILE"][file_key].items() %}
+                                        {% if val is not none and val != "" and key != "FILE_CAPTION" %}
+                                          <tr>
+                                          <td class="nowrap normal white">{{ key.replace("_", " ").title() }}:</td>
+                                          <td class="normal white small">{{ val }}</td>
+                                          </tr>
+                                        {% endif %}
+                                      {% endfor %}
+                                      </table>
+                                    {% else %}
+                                      {{ msg|replace('\n', '<br />') |safe }}
+                                    {% endif %}
+                                    </div>
+                                  </td>
+                                </tr>
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+                          </table>
+                        </div>
+                      <br />
+                    </body>
+                </html>

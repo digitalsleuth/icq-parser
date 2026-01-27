@@ -45,9 +45,8 @@ except ImportError:
 ## TODO: use app-settings, dialogs, dialog-states, not just output them.
 ## TODO: core.stg - core_settings_values - core/core_settings.h
 ## TODO: include ignorelist as page
-## TODO: Use History ID as Message ID for iOS under get_message
 
-__version__ = "1.4.0"
+__version__ = "1.4.1"
 __author__ = "Corey Forman (digitalsleuth)"
 __fmt__ = "%Y-%m-%d %H:%M:%S"
 PDFS = []
@@ -2461,7 +2460,8 @@ class iOSParser:
         for this_message in ZMRMESSAGE:
             pid = this_message[ZMRMESSAGE_hdr["ZCONTACTPID"]]
             uid = pid.split("|wim|")[1]
-            mid = this_message[ZMRMESSAGE_hdr["Z_PK"]]
+            mid = this_message[ZMRMESSAGE_hdr["ZHISTORYID"]]
+            pk = this_message[ZMRMESSAGE_hdr["Z_PK"]]
             if uid not in self.MESSAGES:
                 self.MESSAGES[uid] = {}
             self.MESSAGES[uid][mid] = {"MESSAGE": {}, "UID": uid}
@@ -2521,7 +2521,7 @@ class iOSParser:
                 self.MESSAGES[uid][mid]["MESSAGE"]["CONTACT_PARTICIPANT"] = f"[{uid}]"
             for msg_part in ZMRMESSAGEPART:
                 parid = msg_part[ZMRMESSAGEPART_hdr["ZPARENT"]]
-                if parid == mid:
+                if parid == pk:
                     self.MESSAGES[uid][mid]["MESSAGE"]["PART_ID"] = msg_part[
                         ZMRMESSAGEPART_hdr["Z_PK"]
                     ]
